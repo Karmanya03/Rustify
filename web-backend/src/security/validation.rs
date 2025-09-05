@@ -34,7 +34,14 @@ pub fn validate_quality(quality: &str) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn sanitize_filename(filename: &str) -> String {
-    sanitize_filename::sanitize(filename)
+    // Simple filename sanitization without external dependency
+    filename
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c => c,
+        })
+        .collect()
 }
 
 #[allow(dead_code)]

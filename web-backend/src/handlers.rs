@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use tracing::{info, warn, error};
+use tracing::info;
 
 use crate::state::{AppState, TaskResponse};
 

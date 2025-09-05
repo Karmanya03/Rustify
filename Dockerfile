@@ -12,26 +12,12 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy Cargo files first for better caching
+# Copy the web-backend project files
 COPY web-backend/Cargo.toml ./web-backend/
-COPY shared/Cargo.toml ./shared/
-COPY Cargo.toml Cargo.lock ./
-
-# Create dummy source files to build dependencies
-RUN mkdir -p web-backend/src shared/src && \
-    echo "fn main() {}" > web-backend/src/main.rs && \
-    echo "// dummy" > shared/src/lib.rs
-
-# Build dependencies (this layer will be cached)
-WORKDIR /app/web-backend
-RUN cargo build --release
-RUN rm -rf src
-
-# Copy the actual source code
-COPY web-backend/src ./src
-COPY shared/src ../shared/src
+COPY web-backend/src ./web-backend/src
 
 # Build the application
+WORKDIR /app/web-backend
 RUN cargo build --release
 
 # Stage 2: Runtime image

@@ -1,8 +1,8 @@
 # Build directories
 /target/
-/dist/
 /build/
 /node_modules/
+# Note: dist/ is included for deployment
 
 # Rust
 **/*.rs.bk

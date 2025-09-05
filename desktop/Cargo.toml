@@ -1,0 +1,28 @@
+[package]
+name = "rustify-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop GUI for Rustify YouTube converter"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "1.0", features = [] }
+
+[dependencies]
+rustify-core = { path = "../core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "1.0", features = ["dialog-open", "dialog-save", "fs-create-dir", "fs-exists", "fs-read-file", "fs-write-file", "notification-all", "shell-open"] }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { version = "1.0", features = ["v4"] }
+
+[features]
+# by default Tauri runs in production mode
+# when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
+default = ["custom-protocol"]
+# this feature is used for production builds where `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

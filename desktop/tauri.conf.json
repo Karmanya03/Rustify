@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/1.0",
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "devPath": "../dist",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "EzP3",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": true
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "createDir": true,
+        "exists": true
+      },
+      "notification": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": false,
+      "category": "DeveloperTool",
+      "copyright": "",
+      "identifier": "com.ezp3.app"
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 700,
+        "resizable": true,
+        "title": "EzP3 - YouTube Converter",
+        "width": 1000,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ]
+  }
+}

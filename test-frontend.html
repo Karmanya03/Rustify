@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EzP3 - YouTube Converter Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 { text-align: center; color: #fff; }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background: #45a049; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            white-space: pre-wrap;
+            display: none;
+        }
+        .error { background: rgba(255, 0, 0, 0.3); }
+        .success { background: rgba(0, 255, 0, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 EzP3 - YouTube Converter</h1>
+        
+        <div class="form-group">
+            <label for="url">YouTube URL:</label>
+            <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..." 
+                   value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+        </div>
+        
+        <div class="form-group">
+            <label for="format">Format:</label>
+            <select id="format">
+                <option value="mp4">MP4 (Video)</option>
+                <option value="mp3">MP3 (Audio)</option>
+                <option value="flac">FLAC (Audio)</option>
+                <option value="aac">AAC (Audio)</option>
+                <option value="ogg">OGG (Audio)</option>
+                <option value="webm">WebM (Video)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="quality">Quality:</label>
+            <select id="quality">
+                <option value="720p">720p</option>
+                <option value="1080p">1080p</option>
+                <option value="480p">480p</option>
+                <option value="128">128 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="320">320 kbps</option>
+            </select>
+        </div>
+        
+        <button onclick="testHealth()">🔥 Test Server Health</button>
+        <button onclick="getVideoInfo()">📺 Get Video Info</button>
+        <button onclick="startConversion()">🎬 Start Conversion</button>
+        <button onclick="getTasks()">📋 Get All Tasks</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api';
+        
+        function showResult(data, isError = false) {
+            const result = document.getElementById('result');
+            result.style.display = 'block';
+            result.className = isError ? 'result error' : 'result success';
+            result.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult({ status: 'Server is healthy!', data });
+            } catch (error) {
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function getVideoInfo() {
+            const url = document.getElementById('url').value;
+            if (!url) {
+                showResult({ error: 'Please enter a YouTube URL' }, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/info`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult({ message: 'Video info retrieved!', data });
+            } catch (error) {
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function startConversion() {
+            const url = document.getElementById('url').value;
+            const format = document.getElementById('format').value;
+            const quality = document.getElementById('quality').value;
+            
+            if (!url) {
+                showResult({ error: 'Please enter a YouTube URL' }, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/convert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url,
+                        format,
+                        quality,
+                        output_path: null
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult({ message: 'Conversion started!', task: data });
+            } catch (error) {
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function getTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/tasks`);
+                const data = await response.json();
+                showResult({ message: 'Current tasks:', tasks: data });
+            } catch (error) {
+                showResult({ error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

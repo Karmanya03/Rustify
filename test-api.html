@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EzP3 API Test</title>
+</head>
+<body>
+    <h1>EzP3 API Test</h1>
+    
+    <div>
+        <h3>Test Video Info</h3>
+        <button onclick="testVideoInfo()">Get Video Info</button>
+        <div id="video-info-result"></div>
+    </div>
+    
+    <div>
+        <h3>Test Conversion</h3>
+        <button onclick="testConversion()">Start Conversion</button>
+        <div id="conversion-result"></div>
+    </div>
+    
+    <div>
+        <h3>Test Tasks</h3>
+        <button onclick="testTasks()">Get Tasks</button>
+        <div id="tasks-result"></div>
+    </div>
+
+    <script>
+        async function testVideoInfo() {
+            try {
+                const response = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' })
+                });
+                const result = await response.json();
+                document.getElementById('video-info-result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('video-info-result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+        
+        async function testConversion() {
+            try {
+                const response = await fetch('/api/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                        format: 'mp3',
+                        quality: '320'
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('conversion-result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('conversion-result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+        
+        async function testTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                const result = await response.json();
+                document.getElementById('tasks-result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('tasks-result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

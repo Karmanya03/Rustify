@@ -1,0 +1,51 @@
+[package]
+name = "rustify-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core library for high-performance YouTube video conversion"
+license = "MIT"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+regex = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# YouTube extraction
+youtube_dl = "0.8"
+
+# FFmpeg bindings - commented out for now
+# ffmpeg-next = "6.0"
+# ffmpeg-sys-next = "6.0"
+
+# Audio/Video processing - simplified
+# symphonia = { version = "0.5", features = ["all"] }
+# rubato = "0.14"
+
+# Async and concurrency
+futures = "0.3"
+rayon = "1.7"
+crossbeam = "0.8"
+
+# HTTP and networking
+url = "2.4"
+bytes = "1.4"
+
+# Progress tracking
+indicatif = "0.17"
+
+# Configuration
+config = "0.13"
+dirs = "5.0"
+
+# Error handling
+color-eyre = "0.6"
+
+# System info
+num_cpus = "1.16"

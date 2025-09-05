@@ -1,0 +1,27 @@
+# Render.com deployment configuration for Rustify Web Backend
+# This file should be placed in the root of your repository
+
+services:
+  - type: web
+    name: rustify-web-backend
+    runtime: rust
+    plan: free
+    buildCommand: |
+      cd web-backend
+      cargo build --release
+    startCommand: |
+      cd web-backend
+      ./target/release/rustify-web-backend
+    envVars:
+      - key: RUST_LOG
+        value: info
+      - key: PORT
+        value: 10000
+      - key: RUSTIFY_BIND_HOST
+        value: "0.0.0.0"
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: rustify-data
+      size: 1GB
+      mountPath: /data

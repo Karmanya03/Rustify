@@ -1,0 +1,160 @@
+# Build directories
+/target/
+/dist/
+/build/
+/node_modules/
+
+# Rust
+**/*.rs.bk
+*.pdb
+
+# Logs (SECURITY: May contain sensitive information)
+*.log
+logs/
+audit.log
+error.log
+access.log
+security.log
+
+# Environment files (SECURITY: Contains secrets)
+.env
+.env.*
+.environment
+*.env
+config.toml
+config.yaml
+config.yml
+.secrets
+secrets.json
+secrets.toml
+
+# Security files (CRITICAL: Never commit these)
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+jwt_secret.txt
+csrf_secret.txt
+api_keys.txt
+private_keys/
+certificates/
+ssl/
+tls/
+
+# Database files (SECURITY: May contain user data)
+*.db
+*.sqlite
+*.sqlite3
+*.db3
+database/
+data/
+
+# Backup files (SECURITY: May contain sensitive data)
+*.backup
+*.bak
+*.dump
+*.sql
+backups/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE (SECURITY: May contain project secrets)
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+.cache/
+cache/
+
+# Downloads directory (SECURITY: User uploaded content)
+/downloads/
+/output/
+/uploads/
+/media/
+user_files/
+
+# Config files (SECURITY: May contain sensitive data)
+config.json
+settings.json
+app.config
+production.json
+development.json
+
+# FFmpeg binaries (if bundled)
+/ffmpeg/
+/bin/ffmpeg*
+/tools/
+
+# Generated files
+*.wasm
+pkg/
+
+# Session and auth files (SECURITY: Contains user sessions)
+sessions/
+auth/
+tokens/
+*.session
+session.json
+
+# Error dumps and core files (SECURITY: May leak sensitive info)
+core.*
+*.dmp
+crash_reports/
+error_dumps/
+
+# Monitoring and metrics (SECURITY: May contain sensitive metrics)
+metrics/
+monitoring/
+stats/
+
+# Third-party dependencies with potential secrets
+vendor/
+third_party/
+
+# Test files that might contain secrets
+test_secrets/
+test_config/
+.test_env
+
+# Package manager files that might leak info
+package-lock.json
+yarn.lock
+Cargo.lock
+
+# Container and deployment files (SECURITY: May contain secrets)
+docker-compose.override.yml
+.dockerignore
+kubernetes/
+k8s/
+helm/
+deployment/
+
+# Cloud provider configs (SECURITY: Contains cloud credentials)
+.aws/
+.azure/
+.gcp/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars

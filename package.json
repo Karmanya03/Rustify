@@ -1,0 +1,28 @@
+{
+  "name": "ezp3-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EzP3 YouTube Converter - Workspace configuration",
+  "scripts": {
+    "build": "cargo build --release",
+    "dev": "cargo run",
+    "test": "cargo test",
+    "cli": "cargo run --bin ezp3",
+    "desktop": "cd desktop && cargo tauri dev",
+    "web": "cd web-backend && cargo run",
+    "install-deps": "npm run install-ffmpeg && npm run install-tauri",
+    "install-ffmpeg": "echo 'Please install FFmpeg manually: https://ffmpeg.org/download.html'",
+    "install-tauri": "cargo install tauri-cli",
+    "setup": "npm run install-deps && cargo build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.0"
+  },
+  "workspaces": [
+    "core",
+    "cli", 
+    "desktop",
+    "web-backend"
+  ]
+}

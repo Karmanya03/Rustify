@@ -1,15 +1,14 @@
 # Dockerfile optimized for Render.com deployment
-FROM rust:1.75 as builder
+FROM rust:1.80-slim-bookworm as builder
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the entire project (workspace)
-COPY ../ ./
+# Copy only the web-backend project
+COPY . ./
 
 # Build the web-backend binary
-WORKDIR /app/web-backend
-RUN cargo build --release --bin rustify-web-backend
+RUN cargo build --release
 
 # Runtime stage with minimal image
 FROM debian:bookworm-slim
@@ -17,17 +16,18 @@ FROM debian:bookworm-slim
 # Install necessary runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    curl \
+    pkg-config \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Copy the compiled binary
-COPY --from=builder /app/target/release/rustify-web-backend ./rustify-web-backend
+COPY --from=builder /app/target/release/web-backend ./web-backend
 
-# Copy static files (frontend) - adjust path for proper serving
-COPY --from=builder /app/dist ../dist
+# Copy static files (frontend)
+COPY ../dist ./dist
 
 # Expose port (Render.com uses 10000 by default)
 EXPOSE 10000
@@ -36,4 +36,4 @@ EXPOSE 10000
 ENV RUST_LOG=info
 
 # Run the application
-CMD ["./rustify-web-backend"]
+CMD ["./web-backend"]

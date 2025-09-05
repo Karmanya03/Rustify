@@ -15,10 +15,7 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
-    compression::CompressionLayer,
     trace::TraceLayer,
-    limit::RequestBodyLimitLayer,
-    sensitive_headers::SetSensitiveRequestHeadersLayer,
 };
 use tracing::{info, Level};
 use std::time::Duration;
@@ -71,20 +68,10 @@ async fn main() -> anyhow::Result<()> {
             ServiceBuilder::new()
                 // Security headers
                 .layer(middleware::from_fn(security::headers::security_headers_middleware))
-                // Request size limiting
-                .layer(RequestBodyLimitLayer::new(1024 * 1024)) // 1MB max for API
-                // Compression (be careful with sensitive data)
-                .layer(CompressionLayer::new())
                 // Request tracing
                 .layer(TraceLayer::new_for_http())
                 // CORS (after security headers)
                 .layer(cors)
-                // Sensitive headers filtering
-                .layer(SetSensitiveRequestHeadersLayer::new([
-                    header::AUTHORIZATION,
-                    header::COOKIE,
-                    axum::http::HeaderName::from_static("x-csrf-token"),
-                ]))
         )
         .with_state(state);
 

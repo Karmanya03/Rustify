@@ -32,6 +32,7 @@ pub struct TaskUpdate {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 pub enum TaskStatus {
     Pending,
     Converting,
@@ -54,11 +55,13 @@ impl AppState {
         self.task_updates.subscribe()
     }
 
+    #[allow(dead_code)]
     pub async fn get_all_tasks(&self) -> Vec<TaskResponse> {
         let tasks = self.tasks.lock().await;
         tasks.values().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub async fn broadcast_update(&self, update: TaskUpdate) {
         let _ = self.task_updates.send(update);
     }

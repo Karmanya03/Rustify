@@ -1,4 +1,4 @@
-use crate::state::{AppState, TaskUpdate};
+use crate::state::AppState;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},

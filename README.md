@@ -1,4 +1,4 @@
-# EzP3 - High-Performance YouTube Video Converter
+# Rustify- High-Performance YouTube Video Converter
 
 A blazingly fast, high-quality YouTube video converter built with Rust that supports multiple formats and quality options with zero compression loss.
 
@@ -34,7 +34,7 @@ A blazingly fast, high-quality YouTube video converter built with Rust that supp
 ## Architecture
 
 ```
-ezp3/
+Rustify/
 ├── core/           # Core conversion logic and YouTube API handling
 ├── cli/            # Command-line interface
 ├── desktop/        # Tauri-based desktop application  
@@ -55,8 +55,8 @@ ezp3/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ezp3.git
-cd ezp3
+git clone https://github.com/yourusername/Rustify.git
+cd Rustify
 
 # Build all components
 cargo build --release

@@ -2,11 +2,15 @@ use std::collections::HashMap;
 use tokio::sync::{Mutex, broadcast};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use crate::youtube::YouTubeDownloader;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-    pub tasks: std::sync::Arc<Mutex<HashMap<String, TaskResponse>>>,
+    pub tasks: Arc<Mutex<HashMap<String, TaskResponse>>>,
     pub task_updates: broadcast::Sender<TaskUpdate>,
+    pub youtube_downloader: Arc<YouTubeDownloader>,
+    pub downloads_dir: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -44,10 +48,24 @@ pub enum TaskStatus {
 impl AppState {
     pub async fn new() -> anyhow::Result<Self> {
         let (task_updates, _) = broadcast::channel(100);
+        let youtube_downloader = Arc::new(YouTubeDownloader::new());
+        
+        // Check if yt-dlp is available
+        if let Err(e) = youtube_downloader.check_dependencies().await {
+            tracing::warn!("YouTube downloader dependencies check failed: {}", e);
+        }
+        
+        let downloads_dir = std::env::var("DOWNLOADS_DIR")
+            .unwrap_or_else(|_| "./downloads".to_string());
+        
+        // Create downloads directory if it doesn't exist
+        tokio::fs::create_dir_all(&downloads_dir).await?;
         
         Ok(Self {
-            tasks: std::sync::Arc::new(Mutex::new(HashMap::new())),
+            tasks: Arc::new(Mutex::new(HashMap::new())),
             task_updates,
+            youtube_downloader,
+            downloads_dir,
         })
     }
 

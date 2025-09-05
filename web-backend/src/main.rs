@@ -2,6 +2,7 @@ mod handlers;
 mod websocket;
 mod state;
 mod security;
+mod youtube;
 
 use axum::{
     http::{header, Method},
@@ -81,9 +82,9 @@ async fn main() -> anyhow::Result<()> {
         .parse::<u16>()
         .unwrap_or(3001);
     
-    // Use 0.0.0.0 for production deployment (Render.com, etc.)
+    // Use 127.0.0.1 for local development, 0.0.0.0 for production deployment (Render.com, etc.)
     let host = std::env::var("HOST")
-        .unwrap_or_else(|_| "0.0.0.0".to_string());
+        .unwrap_or_else(|_| "127.0.0.1".to_string());
     
     let addr = if host == "0.0.0.0" {
         SocketAddr::from(([0, 0, 0, 0], port))

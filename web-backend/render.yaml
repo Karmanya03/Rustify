@@ -11,7 +11,7 @@ services:
       cargo build --release
     startCommand: |
       cd web-backend
-      ./target/release/rustify-web-backend
+      ./target/release/web-backend
     envVars:
       - key: RUST_LOG
         value: info

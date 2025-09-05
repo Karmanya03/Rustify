@@ -27,7 +27,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/web-backend ./web-backend
 
 # Copy static files (frontend)
-COPY ../dist ./dist
+COPY dist ./dist
 
 # Expose port (Render.com uses 10000 by default)
 EXPOSE 10000

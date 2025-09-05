@@ -1,61 +1,42 @@
-// Simple Security Headers Module
 use axum::{
-    body::Body,
-    http::{HeaderName, HeaderValue, Request},
+    http::{Request, HeaderValue, header},
     middleware::Next,
     response::Response,
 };
 
-// Security headers middleware
-pub async fn security_headers_middleware(
-    request: Request<Body>,
-    next: Next,
+pub async fn security_headers_middleware<B>(
+    request: Request<B>,
+    next: Next<B>,
 ) -> Response {
     let mut response = next.run(request).await;
     
     let headers = response.headers_mut();
     
-    // Prevent XSS attacks
+    // Security headers
     headers.insert(
-        HeaderName::from_static("x-content-type-options"),
-        HeaderValue::from_static("nosniff"),
-    );
-
-    // Prevent clickjacking
-    headers.insert(
-        HeaderName::from_static("x-frame-options"),
-        HeaderValue::from_static("DENY"),
-    );
-
-    // XSS Protection
-    headers.insert(
-        HeaderName::from_static("x-xss-protection"),
-        HeaderValue::from_static("1; mode=block"),
-    );
-
-    // Referrer Policy
-    headers.insert(
-        HeaderName::from_static("referrer-policy"),
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
-
-    // Content Security Policy
-    headers.insert(
-        HeaderName::from_static("content-security-policy"),
-        HeaderValue::from_static(
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-        ),
-    );
-
-    // HSTS
-    headers.insert(
-        HeaderName::from_static("strict-transport-security"),
+        header::STRICT_TRANSPORT_SECURITY,
         HeaderValue::from_static("max-age=31536000; includeSubDomains"),
     );
-
-    // Remove server headers
-    headers.remove("server");
-    headers.remove("x-powered-by");
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::X_FRAME_OPTIONS,
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        "X-XSS-Protection",
+        HeaderValue::from_static("1; mode=block"),
+    );
+    headers.insert(
+        "Referrer-Policy",
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        "Content-Security-Policy",
+        HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data: blob:; connect-src 'self' ws: wss:"),
+    );
     
     response
 }

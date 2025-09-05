@@ -23,32 +23,6 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
     
     info!("New WebSocket connection established");
     
-    // Send current tasks on connection
-    let current_tasks = state.get_all_tasks().await;
-    for task in current_tasks {
-        let update = TaskUpdate {
-            task_id: task.id,
-            status: match task.status.as_str() {
-                "pending" => crate::state::TaskStatus::Pending,
-                "converting" => crate::state::TaskStatus::Converting,
-                "completed" => crate::state::TaskStatus::Completed,
-                "cancelled" => crate::state::TaskStatus::Cancelled,
-                s if s.starts_with("failed") => crate::state::TaskStatus::Failed(s.to_string()),
-                _ => crate::state::TaskStatus::Pending,
-            },
-            progress: task.progress,
-            speed: "0x".to_string(),
-            eta: "Unknown".to_string(),
-        };
-        
-        if let Ok(message) = serde_json::to_string(&update) {
-            if sender.send(Message::Text(message)).await.is_err() {
-                warn!("Failed to send initial task update");
-                return;
-            }
-        }
-    }
-    
     // Handle incoming messages and broadcast updates
     loop {
         tokio::select! {

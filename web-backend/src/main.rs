@@ -57,13 +57,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/tasks/:id", axum::routing::delete(handlers::cancel_task))
         .route("/api/download/:id", get(handlers::download_file))
         .route("/api/health", get(handlers::health_check))
+        .route("/health", get(handlers::health_check))
         
         // WebSocket for real-time updates
         .route("/ws", get(websocket::websocket_handler))
         
         // Serve static files (frontend)
-        .nest_service("/", ServeDir::new("../dist")
-            .fallback(ServeFile::new("../dist/index.html")))
+        .nest_service("/", ServeDir::new("./dist")
+            .fallback(ServeFile::new("./dist/index.html")))
         
         // Apply security middleware layers
         .layer(
@@ -93,9 +94,9 @@ async fn main() -> anyhow::Result<()> {
         .parse::<u16>()
         .unwrap_or(3001);
     
-    // Use environment variable for host binding, default to localhost for development
-    let host = std::env::var("RUSTIFY_BIND_HOST")
-        .unwrap_or_else(|_| "127.0.0.1".to_string());
+    // Use 0.0.0.0 for production deployment (Render.com, etc.)
+    let host = std::env::var("HOST")
+        .unwrap_or_else(|_| "0.0.0.0".to_string());
     
     let addr = if host == "0.0.0.0" {
         SocketAddr::from(([0, 0, 0, 0], port))

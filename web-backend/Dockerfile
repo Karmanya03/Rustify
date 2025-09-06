@@ -20,11 +20,15 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     python3 \
     python3-pip \
+    python3-venv \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp with --break-system-packages flag for Docker environment
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
+# Install yt-dlp with multiple fallback methods
+RUN python3 -m pip install --no-cache-dir --break-system-packages yt-dlp || \
+    python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir yt-dlp && \
+    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp
 
 # Set working directory
 WORKDIR /app

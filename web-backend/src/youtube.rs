@@ -152,14 +152,11 @@ impl YouTubeDownloader {
         let output = self.execute_yt_dlp_command(&[
             "--dump-json",
             "--no-download",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "--referer", "https://www.youtube.com/",
+            "--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--add-header", "Sec-Fetch-Dest:document",
-            "--add-header", "Sec-Fetch-Mode:navigate",
-            "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "10",
+            "--extractor-retries", "3",
             "--geo-bypass",
+            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -188,14 +185,11 @@ impl YouTubeDownloader {
             "--dump-json",
             "--flat-playlist",
             "--no-download",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "--referer", "https://www.youtube.com/",
+            "--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--add-header", "Sec-Fetch-Dest:document",
-            "--add-header", "Sec-Fetch-Mode:navigate",
-            "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "10",
+            "--extractor-retries", "3",
             "--geo-bypass",
+            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -245,14 +239,11 @@ impl YouTubeDownloader {
             "--list-formats",
             "--dump-json",
             "--no-download",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "--referer", "https://www.youtube.com/",
+            "--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--add-header", "Sec-Fetch-Dest:document",
-            "--add-header", "Sec-Fetch-Mode:navigate",
-            "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "10",
+            "--extractor-retries", "3",
             "--geo-bypass",
+            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -291,48 +282,25 @@ impl YouTubeDownloader {
             .canonicalize()
             .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
 
-        // Advanced bot protection bypass arguments (production-safe)
+        // Render.com optimized bot protection (minimal, proven options only)
         let bot_bypass_args = vec![
-            // Advanced user agent with more realistic fingerprint
+            // Essential user agent spoofing (Linux for Render.com)
             "--user-agent".to_string(),
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
-            // Referer to simulate coming from YouTube
-            "--referer".to_string(),
-            "https://www.youtube.com/".to_string(),
-            // Additional headers to mimic real browser
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
+            // Basic headers that work reliably
             "--add-header".to_string(),
             "Accept-Language:en-US,en;q=0.9".to_string(),
-            "--add-header".to_string(),
-            "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8".to_string(),
-            "--add-header".to_string(),
-            "Accept-Encoding:gzip, deflate, br".to_string(),
-            "--add-header".to_string(),
-            "Connection:keep-alive".to_string(),
-            "--add-header".to_string(),
-            "Upgrade-Insecure-Requests:1".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Dest:document".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Mode:navigate".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Site:none".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-User:?1".to_string(),
-            // Retry and rate limiting
+            // Conservative retry strategy for free tier
             "--extractor-retries".to_string(),
-            "10".to_string(),
+            "3".to_string(),
             "--fragment-retries".to_string(),
-            "10".to_string(),
+            "3".to_string(),
             "--retry-sleep".to_string(),
-            "exp=1:120".to_string(),
-            "--sleep-interval".to_string(),
-            "1".to_string(),
-            // Production-safe anti-detection measures
-            "--embed-chapters".to_string(),
-            "--embed-info-json".to_string(),
-            "--write-info-json".to_string(),
+            "linear=2:10:20".to_string(),
+            // Essential bypass options that work on all systems
             "--geo-bypass".to_string(),
-            "--mark-watched".to_string(),
+            "--no-check-certificate".to_string(),
+            "--ignore-errors".to_string(),
         ];
 
         let mut format_args = match options.format.as_str() {
@@ -433,48 +401,25 @@ impl YouTubeDownloader {
             output_dir.to_string_lossy().replace('\\', "/")
         );
 
-        // Advanced bot protection bypass arguments (production-safe)
+        // Render.com optimized bot protection (minimal, proven options only)
         let bot_bypass_args = vec![
-            // Advanced user agent with more realistic fingerprint
+            // Essential user agent spoofing (Linux for Render.com)
             "--user-agent".to_string(),
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
-            // Referer to simulate coming from YouTube
-            "--referer".to_string(),
-            "https://www.youtube.com/".to_string(),
-            // Additional headers to mimic real browser
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
+            // Basic headers that work reliably
             "--add-header".to_string(),
             "Accept-Language:en-US,en;q=0.9".to_string(),
-            "--add-header".to_string(),
-            "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8".to_string(),
-            "--add-header".to_string(),
-            "Accept-Encoding:gzip, deflate, br".to_string(),
-            "--add-header".to_string(),
-            "Connection:keep-alive".to_string(),
-            "--add-header".to_string(),
-            "Upgrade-Insecure-Requests:1".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Dest:document".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Mode:navigate".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-Site:none".to_string(),
-            "--add-header".to_string(),
-            "Sec-Fetch-User:?1".to_string(),
-            // Retry and rate limiting
+            // Conservative retry strategy for free tier
             "--extractor-retries".to_string(),
-            "10".to_string(),
+            "3".to_string(),
             "--fragment-retries".to_string(),
-            "10".to_string(),
+            "3".to_string(),
             "--retry-sleep".to_string(),
-            "exp=1:120".to_string(),
-            "--sleep-interval".to_string(),
-            "1".to_string(),
-            // Production-safe anti-detection measures
-            "--embed-chapters".to_string(),
-            "--embed-info-json".to_string(),
-            "--write-info-json".to_string(),
+            "linear=2:10:20".to_string(),
+            // Essential bypass options that work on all systems
             "--geo-bypass".to_string(),
-            "--mark-watched".to_string(),
+            "--no-check-certificate".to_string(),
+            "--ignore-errors".to_string(),
         ];
 
         // First, get playlist info to know how many videos we're dealing with

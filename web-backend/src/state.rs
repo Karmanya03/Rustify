@@ -24,6 +24,7 @@ pub struct TaskResponse {
     pub created_at: DateTime<Utc>,
     pub output_path: Option<String>,
     pub file_path: Option<String>,
+    pub playlist_files: Option<Vec<String>>, // For playlist downloads - stores all file paths
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -50,7 +51,7 @@ impl AppState {
         let (task_updates, _) = broadcast::channel(100);
         let youtube_downloader = Arc::new(YouTubeDownloader::new());
         
-        // Check if yt-dlp is available
+        // Simple dependency check without extra warnings
         if let Err(e) = youtube_downloader.check_dependencies().await {
             tracing::warn!("YouTube downloader dependencies check failed: {}", e);
         }

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::fs;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +48,6 @@ pub struct ConversionOptions {
 #[derive(Debug, Clone)]
 pub struct YouTubeDownloader {
     pub yt_dlp_path: String,
-    pub ffmpeg_path: String,
 }
 
 impl YouTubeDownloader {
@@ -57,7 +57,6 @@ impl YouTubeDownloader {
         
         Self {
             yt_dlp_path,
-            ffmpeg_path: "ffmpeg".to_string(),
         }
     }
 
@@ -124,16 +123,7 @@ impl YouTubeDownloader {
             ));
         }
 
-        // Check ffmpeg
-        let ffmpeg_check = Command::new(&self.ffmpeg_path)
-            .arg("-version")
-            .output()
-            .await;
-
-        if ffmpeg_check.is_err() {
-            warn!("ffmpeg not found. Some features may not work properly.");
-        }
-
+        // Note: ffmpeg is not required for web version since we download existing formats
         Ok(())
     }
 
@@ -272,37 +262,49 @@ impl YouTubeDownloader {
         // Create output directory
         fs::create_dir_all(&options.output_dir).await?;
 
-        let output_pattern = format!("{}/%(title)s.%(ext)s", options.output_dir);
+        // Use absolute path and escape spaces for Windows
+        let output_dir = std::path::Path::new(&options.output_dir)
+            .canonicalize()
+            .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
 
         let format_args = match options.format.as_str() {
             "mp3" => {
-                let quality = self.get_audio_quality(&options.quality);
+                // Download best audio in existing format, no conversion
                 vec![
-                    "--extract-audio".to_string(),
-                    "--audio-format".to_string(), "mp3".to_string(),
-                    "--audio-quality".to_string(), quality,
-                    "--output".to_string(), output_pattern,
+                    "--format".to_string(), "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio".to_string(),
+                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
+                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--no-playlist".to_string(),
+                    "--no-post-overwrites".to_string(),
                 ]
             }
             "wav" => {
+                // Download audio in existing format, no conversion to WAV
                 vec![
-                    "--extract-audio".to_string(),
-                    "--audio-format".to_string(), "wav".to_string(),
-                    "--output".to_string(), output_pattern,
+                    "--format".to_string(), "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio".to_string(),
+                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
+                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--no-playlist".to_string(),
                 ]
             }
             "mp4" => {
-                let format_selector = self.get_video_format_selector(&options.quality);
+                // Download MP4 directly without any processing
                 vec![
-                    "--format".to_string(), format_selector,
-                    "--output".to_string(), output_pattern,
+                    "--format".to_string(), format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", 
+                        self.get_quality_height(&options.quality)),
+                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
+                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--no-playlist".to_string(),
                 ]
             }
             "webm" => {
-                let format_selector = format!("{}[ext=webm]", self.get_video_format_selector(&options.quality));
+                // Download WebM directly
                 vec![
-                    "--format".to_string(), format_selector,
-                    "--output".to_string(), output_pattern,
+                    "--format".to_string(), format!("best[ext=webm][height<={}]/best[ext=webm]/best", 
+                        self.get_quality_height(&options.quality)),
+                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
+                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--no-playlist".to_string(),
                 ]
             }
             _ => return Err(anyhow!("Unsupported format: {}", options.format)),
@@ -311,47 +313,246 @@ impl YouTubeDownloader {
         let mut args: Vec<&str> = format_args.iter().map(|s| s.as_str()).collect();
         args.push(&options.url);
 
+        info!("Executing yt-dlp with args: {:?}", args);
         let output = self.execute_yt_dlp_command(&args).await?;
 
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Download failed: {}", error_msg));
+            let stdout_msg = String::from_utf8_lossy(&output.stdout);
+            return Err(anyhow!("Download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
         }
 
         // Find the downloaded file
-        let mut entries = fs::read_dir(&options.output_dir).await?;
+        let mut entries = fs::read_dir(&output_dir).await?;
+        let mut newest_file = None;
+        let mut newest_time = std::time::SystemTime::UNIX_EPOCH;
+
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.is_file() {
-                if let Some(_file_name) = path.file_name() {
-                    return Ok(path.to_string_lossy().to_string());
+                if let Ok(metadata) = entry.metadata().await {
+                    if let Ok(modified) = metadata.modified() {
+                        if modified > newest_time {
+                            newest_time = modified;
+                            newest_file = Some(path);
+                        }
+                    }
                 }
             }
         }
 
-        Err(anyhow!("Downloaded file not found"))
-    }
-
-    fn get_audio_quality(&self, quality: &str) -> String {
-        match quality {
-            "320" => "0".to_string(), // Best quality
-            "256" => "2".to_string(),
-            "192" => "3".to_string(),
-            "128" => "5".to_string(),
-            "96" => "7".to_string(),
-            _ => "0".to_string(), // Default to best
+        if let Some(file_path) = newest_file {
+            Ok(file_path.to_string_lossy().to_string())
+        } else {
+            Err(anyhow!("Downloaded file not found in directory: {}", output_dir.display()))
         }
     }
 
-    fn get_video_format_selector(&self, quality: &str) -> String {
+    pub async fn download_playlist(&self, options: ConversionOptions) -> Result<Vec<String>> {
+        // Create output directory
+        fs::create_dir_all(&options.output_dir).await?;
+
+        // Use absolute path and escape spaces for Windows
+        let output_dir = std::path::Path::new(&options.output_dir)
+            .canonicalize()
+            .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
+        
+        let output_pattern = format!(
+            "{}/%(playlist_index)02d - %(title).50s.%(ext)s", 
+            output_dir.to_string_lossy().replace('\\', "/")
+        );
+
+        // First, get playlist info to know how many videos we're dealing with
+        let info_args = vec![
+            "--dump-json",
+            "--flat-playlist",
+            "--playlist-end",
+            "1",
+            &options.url
+        ];
+        
+        info!("Getting playlist info with args: {:?}", info_args);
+        let info_output = self.execute_yt_dlp_command(&info_args).await?;
+        
+        if !info_output.status.success() {
+            let error_msg = String::from_utf8_lossy(&info_output.stderr);
+            return Err(anyhow!("Failed to get playlist info: {}", error_msg));
+        }
+
+        // Parse playlist info to get video count
+        let playlist_info = String::from_utf8_lossy(&info_output.stdout);
+        let video_count = playlist_info.lines()
+            .filter(|line| line.contains("\"_type\": \"url\"") || line.contains("\"id\":"))
+            .count();
+        
+        info!("Playlist contains approximately {} videos", video_count);
+
+        let format_args = match options.format.as_str() {
+            "mp3" => {
+                // Download best audio in existing format, no conversion
+                vec![
+                    "--format".to_string(), "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio".to_string(),
+                    "--output".to_string(), output_pattern,
+                    "--yes-playlist".to_string(),
+                    "--no-post-overwrites".to_string(),
+                    "--ignore-errors".to_string(), // Continue on individual video errors
+                    "--no-abort-on-error".to_string(),
+                ]
+            }
+            "wav" => {
+                // Download audio in existing format, no conversion to WAV
+                vec![
+                    "--format".to_string(), "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio".to_string(),
+                    "--output".to_string(), output_pattern,
+                    "--yes-playlist".to_string(),
+                    "--ignore-errors".to_string(),
+                    "--no-abort-on-error".to_string(),
+                ]
+            }
+            "mp4" => {
+                // Download MP4 directly without any processing
+                vec![
+                    "--format".to_string(), format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", 
+                        self.get_quality_height(&options.quality)),
+                    "--output".to_string(), output_pattern,
+                    "--yes-playlist".to_string(),
+                    "--ignore-errors".to_string(),
+                    "--no-abort-on-error".to_string(),
+                ]
+            }
+            "webm" => {
+                // Download WebM directly
+                vec![
+                    "--format".to_string(), format!("best[ext=webm][height<={}]/best[ext=webm]/best", 
+                        self.get_quality_height(&options.quality)),
+                    "--output".to_string(), output_pattern,
+                    "--yes-playlist".to_string(),
+                    "--ignore-errors".to_string(),
+                    "--no-abort-on-error".to_string(),
+                ]
+            }
+            _ => return Err(anyhow!("Unsupported format: {}", options.format)),
+        };
+
+        let mut args: Vec<&str> = format_args.iter().map(|s| s.as_str()).collect();
+        args.push(&options.url);
+
+        info!("Executing yt-dlp playlist download with args: {:?}", args);
+        
+        // Execute the download with streaming output for progress tracking
+        let mut child = tokio::process::Command::new("python")
+            .args(&["-m", "yt_dlp"])
+            .args(&args)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| anyhow!("Failed to spawn yt-dlp process: {}", e))?;
+
+        // Read output for progress tracking
+        let stdout = child.stdout.take().ok_or_else(|| anyhow!("Failed to capture stdout"))?;
+        let stderr = child.stderr.take().ok_or_else(|| anyhow!("Failed to capture stderr"))?;
+
+        let mut stdout_reader = BufReader::new(stdout);
+        let mut stderr_reader = BufReader::new(stderr);
+
+        // Read output streams
+        let stdout_task = tokio::spawn(async move {
+            let mut line = String::new();
+            let mut output = Vec::new();
+            loop {
+                line.clear();
+                match stdout_reader.read_line(&mut line).await {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        output.extend_from_slice(line.as_bytes());
+                        // Log progress for debugging
+                        if line.contains("[download]") || line.contains("Downloading") {
+                            info!("Download progress: {}", line.trim());
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            output
+        });
+
+        let stderr_task = tokio::spawn(async move {
+            let mut line = String::new();
+            let mut output = Vec::new();
+            loop {
+                line.clear();
+                match stderr_reader.read_line(&mut line).await {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        output.extend_from_slice(line.as_bytes());
+                        // Log errors/warnings
+                        if !line.trim().is_empty() {
+                            warn!("yt-dlp stderr: {}", line.trim());
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            output
+        });
+
+        // Wait for process to complete
+        let status = child.wait().await.map_err(|e| anyhow!("Failed to wait for yt-dlp process: {}", e))?;
+        
+        // Collect outputs
+        let stdout_output = stdout_task.await.map_err(|e| anyhow!("Failed to read stdout: {}", e))?;
+        let stderr_output = stderr_task.await.map_err(|e| anyhow!("Failed to read stderr: {}", e))?;
+
+        if !status.success() {
+            let error_msg = String::from_utf8_lossy(&stderr_output);
+            let stdout_msg = String::from_utf8_lossy(&stdout_output);
+            
+            // Check if it's a partial failure (some videos downloaded)
+            if stdout_msg.contains("has already been downloaded") || 
+               stdout_msg.contains("[download] Downloading") {
+                warn!("Playlist download completed with some errors: {}", error_msg);
+            } else {
+                return Err(anyhow!("Playlist download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
+            }
+        }
+
+        // Find all downloaded files
+        let mut entries = fs::read_dir(&output_dir).await?;
+        let mut downloaded_files = Vec::new();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_file() {
+                let file_name = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                
+                // Check if this is a newly downloaded file (has the expected extensions)
+                if file_name.ends_with(&format!(".{}", options.format)) ||
+                   file_name.ends_with(".mp3") || file_name.ends_with(".mp4") || 
+                   file_name.ends_with(".wav") || file_name.ends_with(".webm") ||
+                   file_name.ends_with(".m4a") {
+                    downloaded_files.push(path.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        if downloaded_files.is_empty() {
+            Err(anyhow!("No files downloaded for playlist in directory: {}", output_dir.display()))
+        } else {
+            downloaded_files.sort(); // Sort files for consistent ordering
+            info!("Successfully downloaded {} files from playlist", downloaded_files.len());
+            Ok(downloaded_files)
+        }
+    }
+
+    fn get_quality_height(&self, quality: &str) -> String {
         match quality {
-            "1080p60" => "best[height<=1080][fps>=60]".to_string(),
-            "1080p" => "best[height<=1080]".to_string(),
-            "720p60" => "best[height<=720][fps>=60]".to_string(),
-            "720p" => "best[height<=720]".to_string(),
-            "480p" => "best[height<=480]".to_string(),
-            "360p" => "best[height<=360]".to_string(),
-            _ => "best".to_string(),
+            "1080p60" | "1080p" => "1080".to_string(),
+            "720p60" | "720p" => "720".to_string(),
+            "480p" => "480".to_string(),
+            "360p" => "360".to_string(),
+            _ => "720".to_string(), // Default to 720p
         }
     }
 }

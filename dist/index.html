@@ -1820,9 +1820,13 @@
                 
                 console.log('Playlist conversion result:', result);
                 
-                if (result && Array.isArray(result) && result.length > 0) {
+                if (result && result.id) {
+                    // Single task response from our actual API
+                    showStatus(`Playlist conversion started! Task ID: ${result.id}`, 'success');
+                    monitorTask(result.id);
+                } else if (result && Array.isArray(result) && result.length > 0) {
+                    // Multiple tasks (legacy support)
                     showStatus(`Playlist conversion started! ${result.length} tasks created.`, 'success');
-                    // Monitor all tasks
                     result.forEach(task => {
                         if (task.id) {
                             monitorTask(task.id);
@@ -1830,7 +1834,7 @@
                     });
                 } else {
                     hideProgress();
-                    showStatus('Playlist conversion feature is not yet implemented', 'info');
+                    showStatus('Unexpected response format from server', 'error');
                 }
                 
             } catch (error) {

@@ -1,3 +1,27 @@
+# Downloads and temporary files (SECURITY: May contain user content)
+downloads/
+temp/
+tmp/
+*.tmp
+*.temp
+web-backend/downloads/
+web-backend/temp/
+
+# Test files (not needed in production)
+test*.html
+test*.ps1
+*test*.html
+*test*.js
+
+# Documentation files (keep only main README)
+DEPLOYMENT*.md
+DEVELOPMENT*.md
+AUDIO_QUALITY*.md
+YOUTUBE_GUIDE*.md
+README-*.md
+**/README-*.md
+**/YOUTUBE_GUIDE*.md
+
 # Build directories
 /target/
 /build/

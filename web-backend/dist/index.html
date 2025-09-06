@@ -638,6 +638,189 @@
             user-select: none;
         }
         
+        /* Small button styles for playlist files */
+        .btn-sm {
+            position: relative;
+            padding: 4px 8px;
+            margin: 2px;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            text-align: left;
+            width: 100%;
+            background: transparent;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-outline {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn-outline:hover {
+            background: rgba(59, 130, 246, 0.4);
+            border-color: rgba(59, 130, 246, 0.6);
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Custom animated download all button */
+        .botao {
+            width: 125px;
+            height: 45px;
+            border-radius: 20px;
+            border: none;
+            box-shadow: 1px 1px rgba(107, 221, 215, 0.37);
+            padding: 5px 10px;
+            background: rgb(47,93,197);
+            background: linear-gradient(160deg, rgba(47,93,197,1) 0%, rgba(46,86,194,1) 5%, rgba(47,93,197,1) 11%, rgba(59,190,230,1) 57%, rgba(0,212,255,1) 71%);
+            color: #fff;
+            font-family: Roboto, sans-serif;
+            font-weight: 505;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            filter: drop-shadow(0 0 10px rgba(59, 190, 230, 0.568));
+            transition: .5s linear;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .botao .mysvg {
+            display: none;
+        }
+
+        .botao:hover {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            transition: .5s linear;
+        }
+
+        .botao:hover .texto {
+            display: none;
+        }
+
+        .botao:hover .mysvg {
+            display: inline;
+        }
+
+        .botao:hover::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            width: 100%;
+            height: 100%;
+            border: 3.5px solid transparent;
+            border-top: 3.5px solid #fff;
+            border-right: 3.5px solid #fff;
+            border-radius: 50%;
+            animation: animateC 2s linear infinite;
+        }
+
+        @keyframes animateC {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Rubik's Cube Animation */
+        @keyframes hue-rotate {
+            to {
+                filter: hue-rotate(360deg);
+            }
+        }
+
+        .rubik-container {
+            --w: 30px;
+            --g: 4px;
+            --t: calc(var(--w) + var(--g));
+            width: var(--w);
+            aspect-ratio: 1;
+            perspective: 120px;
+            transform-style: preserve-3d;
+            flex-shrink: 0;
+            margin-right: 10px;
+        }
+
+        .cube {
+            --fz: 0;
+            --rx: 0;
+            --fx: 0;
+            --ry: 0;
+            --fy: 0;
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            width: var(--w);
+            aspect-ratio: 1;
+            bottom: calc(var(--w) * -0.5);
+            right: calc(var(--w) * -0.5);
+            animation:
+                rotate 20s linear infinite,
+                hue-rotate 20s linear infinite;
+            transition: 5s;
+            --a: translateZ(calc(0.5 * var(--w)))
+                translateX(calc(var(--x) * var(--t) - 0.5 * var(--fy) * var(--w)))
+                translateY(calc(var(--y) * var(--t) - 0.5 * var(--fx) * var(--w)))
+                translateZ(
+                calc(
+                    var(--z) * var(--t) - 0.5 * var(--ry) * var(--w) - 0.5 * var(--rx) *
+                    var(--w) - var(--fz) * var(--w)
+                )
+                )
+                rotateX(calc(90deg * var(--rx))) rotateY(calc(90deg * var(--ry)));
+            --p: translateX(calc(-0.5 * var(--w))) translateY(calc(-0.5 * var(--w)))
+                translateZ(calc(-0.5 * var(--w)));
+        }
+
+        .cube:hover {
+            background: #f00e;
+            transition: 0s;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: var(--p) rotateZ(0deg) rotateY(0deg) rotateX(0deg) var(--a);
+            }
+            to {
+                transform: var(--p) rotateZ(360deg) rotateY(720deg) rotateX(360deg) var(--a);
+            }
+        }
+
+        .cube-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.3);
+            backdrop-filter: blur(15px) saturate(130%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .cube-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #f3f4f6;
+            margin-bottom: 15px;
+            background: linear-gradient(45deg, #60a5fa, #a78bfa, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
         .progress-container {
             margin: 2rem 0;
             display: none;
@@ -1166,9 +1349,178 @@
     </div>
     
     <div class="container">
-        <div class="header">
-            <h1>Rustify</h1>
-            <p>Modern YouTube Video & Playlist Converter made on Rust.</p>
+        <div class="header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 80px;">
+            <div style="text-align: left;">
+                <h1>Rustify <span style="font-size: 0.5em; font-weight: 300; color: rgba(255, 255, 255, 0.7); vertical-align: super;">v1.0</span></h1>
+                <p>Modern YouTube Video & Playlist Converter made on Rust.</p>
+                <p style="margin-top: 8px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.8);">
+                    By <a href="https://linktr.ee/Karmanya03" style="color: #60a5fa; text-decoration: none; font-weight: 500; transition: all 0.3s ease;" onmouseover="this.style.color='#93c5fd'" onmouseout="this.style.color='#60a5fa'">Karmanya03</a>
+                </p>
+            </div>
+            <div class="rubik-container">
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:-1;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:0;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:-1;--y:1;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:-1;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:0;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:0;--y:1;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:-1;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:0;--z:1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:-1;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:0;--ry:1;--fy:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--fz:0"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--fz:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--rx:1;--fx:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--rx:1;--fx:1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--ry:1;--fy:-1"></div>
+                <div class="cube" style="--x:1;--y:1;--z:1;--ry:1;--fy:1"></div>
+            </div>
         </div>
         
         <div class="content">
@@ -1689,6 +2041,51 @@
             }
         }
         
+        // Download individual playlist file
+        async function downloadPlaylistFile(taskId, fileIndex) {
+            try {
+                const downloadUrl = `/api/download/${taskId}/${fileIndex}`;
+                
+                // Create a temporary link element and trigger download
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = ''; // Let the server set the filename
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus(`Starting download of file ${fileIndex + 1}...`, 'success');
+            } catch (error) {
+                showStatus(`Download error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Download all playlist files
+        async function downloadAllPlaylistFiles(taskId) {
+            try {
+                // Get task details to find out how many files there are
+                const task = await apiCall(`/tasks/${taskId}`);
+                
+                if (!task.playlist_files || task.playlist_files.length === 0) {
+                    showStatus('No playlist files found to download', 'error');
+                    return;
+                }
+                
+                showStatus(`Starting download of ${task.playlist_files.length} files...`, 'info');
+                
+                // Download each file with a small delay to avoid overwhelming the browser
+                for (let i = 0; i < task.playlist_files.length; i++) {
+                    setTimeout(() => {
+                        downloadPlaylistFile(taskId, i);
+                    }, i * 500); // 500ms delay between downloads
+                }
+                
+                showStatus(`Initiated download of all ${task.playlist_files.length} playlist files! Check your Downloads folder.`, 'success');
+            } catch (error) {
+                showStatus(`Error downloading playlist files: ${error.message}`, 'error');
+            }
+        }
+        
         // API functions
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
@@ -1820,9 +2217,13 @@
                 
                 console.log('Playlist conversion result:', result);
                 
-                if (result && Array.isArray(result) && result.length > 0) {
+                if (result && result.id) {
+                    // Single task response from our actual API
+                    showStatus(`Playlist conversion started! Task ID: ${result.id}`, 'success');
+                    monitorTask(result.id);
+                } else if (result && Array.isArray(result) && result.length > 0) {
+                    // Multiple tasks (legacy support)
                     showStatus(`Playlist conversion started! ${result.length} tasks created.`, 'success');
-                    // Monitor all tasks
                     result.forEach(task => {
                         if (task.id) {
                             monitorTask(task.id);
@@ -1830,7 +2231,7 @@
                     });
                 } else {
                     hideProgress();
-                    showStatus('Playlist conversion feature is not yet implemented', 'info');
+                    showStatus('Unexpected response format from server', 'error');
                 }
                 
             } catch (error) {
@@ -1898,17 +2299,56 @@
                                   task.status === 'completed' ? 'Completed' : 
                                   task.status.charAt(0).toUpperCase() + task.status.slice(1);
                 
+                // Create download buttons section
+                let downloadButtonsHtml = '';
+                if (task.status === 'completed') {
+                    if (task.playlist_files && task.playlist_files.length > 1) {
+                        // Multiple files - show individual download buttons and download all
+                        downloadButtonsHtml = `
+                            <div style="margin-left: 10px;">
+                                <button class="botao" onclick="downloadAllPlaylistFiles('${task.id}')" style="margin-bottom: 5px;">
+                                    <svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="mysvg">
+                                        <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                                        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                                        <g id="SVGRepo_iconCarrier">
+                                            <g id="Interface / Download"> 
+                                                <path id="Vector" d="M6 21H18M12 3V17M12 17L17 12M12 17L7 12" stroke="#f1f1f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                                            </g> 
+                                        </g>
+                                    </svg>
+                                    <span class="texto">Download All (${task.playlist_files.length})</span>
+                                </button>
+                                <div style="max-height: 150px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.3);">
+                                    ${task.playlist_files.map((filePath, index) => {
+                                        const filename = filePath.split(/[/\\]/).pop() || `File ${index + 1}`;
+                                        return `
+                                            <button class="btn btn-sm btn-outline" onclick="downloadPlaylistFile('${task.id}', ${index})" 
+                                                    style="margin: 2px; padding: 4px 8px; font-size: 0.8rem; width: 100%; text-align: left;">
+                                                <i class="fas fa-file-audio"></i> ${filename}
+                                            </button>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Single file download
+                        downloadButtonsHtml = `<button class="btn btn-success" style="margin-left: 10px;" onclick="downloadFile('${task.id}')"><i class="fas fa-download"></i> Download</button>`;
+                    }
+                }
+                
                 taskElement.innerHTML = `
                     <div class="task-info">
                         <h4>${task.title || task.url}</h4>
                         <p>Format: ${task.format.toUpperCase()} | Quality: ${task.quality}</p>
                         <p>Created: ${new Date(task.created_at).toLocaleString()}</p>
                         ${task.progress > 0 && task.progress < 100 ? `<p>Progress: ${Math.round(task.progress)}%</p>` : ''}
+                        ${task.playlist_files && task.playlist_files.length > 1 ? `<p><i class="fas fa-list"></i> Playlist with ${task.playlist_files.length} files</p>` : ''}
                     </div>
-                    <div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
                         <span class="task-status ${statusClass}">${statusText}</span>
-                        ${task.status === 'processing' ? `<button class="btn btn-secondary" style="margin-left: 10px;" onclick="cancelTask('${task.id}')"><i class="fas fa-times"></i> Cancel</button>` : ''}
-                        ${task.status === 'completed' ? `<button class="btn btn-success" style="margin-left: 10px;" onclick="downloadFile('${task.id}')"><i class="fas fa-download"></i> Download</button>` : ''}
+                        ${task.status === 'processing' ? `<button class="btn btn-secondary" style="margin-left: 10px; margin-top: 5px;" onclick="cancelTask('${task.id}')"><i class="fas fa-times"></i> Cancel</button>` : ''}
+                        ${downloadButtonsHtml}
                     </div>
                 `;
                 

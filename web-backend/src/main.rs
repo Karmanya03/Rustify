@@ -54,7 +54,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/tasks/:id", get(handlers::get_task))
         .route("/api/tasks/:id", axum::routing::delete(handlers::cancel_task))
         .route("/api/download/:id", get(handlers::download_file))
+        .route("/api/download/:task_id/:file_index", get(handlers::download_playlist_file))
         .route("/api/health", get(handlers::health_check))
+        .route("/api/dependencies", get(handlers::dependency_check))
         .route("/health", get(handlers::health_check))
         
         // WebSocket for real-time updates

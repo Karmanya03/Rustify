@@ -62,10 +62,6 @@ async fn main() -> anyhow::Result<()> {
         // WebSocket for real-time updates
         .route("/ws", get(websocket::websocket_handler))
         
-        // Serve static files (frontend)
-        .nest_service("/", ServeDir::new("./dist")
-            .fallback(ServeFile::new("./dist/index.html")))
-        
         // Apply security middleware layers
         .layer(
             ServiceBuilder::new()
@@ -76,6 +72,9 @@ async fn main() -> anyhow::Result<()> {
                 // CORS (after security headers)
                 .layer(cors)
         )
+        // Serve static files (frontend) - using fallback_service for Axum 0.7+
+        .fallback_service(ServeDir::new("./dist")
+            .fallback(ServeFile::new("./dist/index.html")))
         .with_state(state);
 
     // Start the server with dynamic port for hosting platforms

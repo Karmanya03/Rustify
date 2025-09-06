@@ -1,6 +1,6 @@
 # Multi-stage Docker build for Rustify
 # Stage 1: Build the Rust application
-FROM rust:1.82-slim-bookworm AS builder
+FROM rust:1.83-slim-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \

@@ -1,13 +1,13 @@
 {
-  "name": "ezp3-workspace",
-  "version": "0.1.0",
+  "name": "rustify-workspace",
+  "version": "1.0.0",
   "private": true,
-  "description": "EzP3 YouTube Converter - Workspace configuration",
+  "description": "Rustify YouTube Converter - Workspace configuration",
   "scripts": {
     "build": "cargo build --release",
     "dev": "cargo run",
     "test": "cargo test",
-    "cli": "cargo run --bin ezp3",
+    "cli": "cargo run --bin rustify",
     "desktop": "cd desktop && cargo tauri dev",
     "web": "cd web-backend && cargo run",
     "install-deps": "npm run install-ffmpeg && npm run install-tauri",
@@ -17,7 +17,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@tauri-apps/cli": "^1.5.0"
+    "@tauri-apps/cli": "^2.0.0"
   },
   "workspaces": [
     "core",

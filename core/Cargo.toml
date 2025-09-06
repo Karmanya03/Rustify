@@ -18,15 +18,15 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 
 # YouTube extraction
-youtube_dl = "0.8"
+youtube_dl = "0.9.0"
 
-# FFmpeg bindings - commented out for now
-# ffmpeg-next = "6.0"
-# ffmpeg-sys-next = "6.0"
+# FFmpeg bindings - latest stable versions
+# ffmpeg-next = "7.0"
+# ffmpeg-sys-next = "7.0"
 
-# Audio/Video processing - simplified
-# symphonia = { version = "0.5", features = ["all"] }
-# rubato = "0.14"
+# Audio/Video processing - latest versions
+# symphonia = { version = "0.5.4", features = ["all"] }
+# rubato = "0.15.0"
 
 # Async and concurrency
 futures = "0.3"

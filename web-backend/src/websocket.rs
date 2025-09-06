@@ -32,7 +32,7 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                     Some(Ok(Message::Text(text))) => {
                         // Handle client messages (e.g., ping, subscribe to specific tasks)
                         if text == "ping"
-                            && sender.send(Message::Text("pong".to_string())).await.is_err() {
+                            && sender.send(Message::Text("pong".to_string().into())).await.is_err() {
                                 break;
                             }
                     }
@@ -54,7 +54,7 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                 match update {
                     Ok(task_update) => {
                         if let Ok(message) = serde_json::to_string(&task_update) {
-                            if sender.send(Message::Text(message)).await.is_err() {
+                            if sender.send(Message::Text(message.into())).await.is_err() {
                                 warn!("Failed to send task update, client disconnected");
                                 break;
                             }

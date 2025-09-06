@@ -1,5 +1,5 @@
 # Dockerfile optimized for Render.com deployment
-FROM rust:1.82-slim-bookworm as builder
+FROM rust:1.83-slim-bookworm as builder
 
 # Set the working directory
 WORKDIR /app

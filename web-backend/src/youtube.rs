@@ -48,15 +48,23 @@ pub struct ConversionOptions {
 #[derive(Debug, Clone)]
 pub struct YouTubeDownloader {
     pub yt_dlp_path: String,
+    pub use_po_token: bool,
 }
 
 impl YouTubeDownloader {
     pub fn new() -> Self {
-        // Try different possible yt-dlp commands
-        let yt_dlp_path = Self::find_yt_dlp_executable();
+        // For Render.com specifically, use direct yt-dlp command
+        let yt_dlp_path = if std::env::var("RENDER").is_ok() {
+            // On Render.com, use direct yt-dlp command
+            "yt-dlp".to_string()
+        } else {
+            // Local development - try different commands
+            Self::find_yt_dlp_executable()
+        };
         
         Self {
             yt_dlp_path,
+            use_po_token: false, // Will enable when needed
         }
     }
 
@@ -128,6 +136,16 @@ impl YouTubeDownloader {
     }
 
     async fn execute_yt_dlp_command(&self, args: &[&str]) -> Result<std::process::Output> {
+        // For Render.com hosting, use simple direct command
+        if std::env::var("RENDER").is_ok() {
+            let mut command = Command::new("yt-dlp");
+            for arg in args {
+                command.arg(arg);
+            }
+            return command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e));
+        }
+
+        // Original logic for local development
         let parts: Vec<&str> = self.yt_dlp_path.split_whitespace().collect();
         if parts.is_empty() {
             return Err(anyhow!("Invalid yt-dlp command"));
@@ -149,23 +167,98 @@ impl YouTubeDownloader {
     }
 
     pub async fn get_video_info(&self, url: &str) -> Result<VideoInfo> {
-        let output = self.execute_yt_dlp_command(&[
-            "--dump-json",
-            "--no-download",
-            "--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--extractor-retries", "3",
-            "--geo-bypass",
-            "--no-check-certificate",
-            url,
-        ]).await?;
+        // Enhanced multi-strategy approach for YouTube bot protection
+        let strategies = [
+            // Strategy 1: Mobile web client (most effective)
+            vec![
+                "--dump-json".to_string(),
+                "--no-download".to_string(),
+                "--extractor-args".to_string(),
+                "youtube:player_client=mweb".to_string(),
+                "--user-agent".to_string(),
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1".to_string(),
+                "--add-header".to_string(),
+                "Accept-Language:en-US,en;q=0.9".to_string(),
+                "--extractor-retries".to_string(),
+                "5".to_string(),
+                "--geo-bypass".to_string(),
+                "--no-check-certificate".to_string(),
+            ],
+            // Strategy 2: Android client with visitor data bypass
+            vec![
+                "--dump-json".to_string(),
+                "--no-download".to_string(),
+                "--extractor-args".to_string(),
+                "youtubetab:skip=webpage".to_string(),
+                "--extractor-args".to_string(),
+                "youtube:player_skip=webpage,configs;player_client=android".to_string(),
+                "--user-agent".to_string(),
+                "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip".to_string(),
+                "--extractor-retries".to_string(),
+                "5".to_string(),
+                "--geo-bypass".to_string(),
+                "--no-check-certificate".to_string(),
+            ],
+            // Strategy 3: Enhanced web client with full headers
+            vec![
+                "--dump-json".to_string(),
+                "--no-download".to_string(),
+                "--extractor-args".to_string(),
+                "youtube:player_client=web".to_string(),
+                "--user-agent".to_string(),
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
+                "--add-header".to_string(),
+                "Accept-Language:en-US,en;q=0.9".to_string(),
+                "--add-header".to_string(),
+                "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8".to_string(),
+                "--add-header".to_string(),
+                "Accept-Encoding:gzip, deflate, br".to_string(),
+                "--add-header".to_string(),
+                "DNT:1".to_string(),
+                "--add-header".to_string(),
+                "Connection:keep-alive".to_string(),
+                "--add-header".to_string(),
+                "Upgrade-Insecure-Requests:1".to_string(),
+                "--extractor-retries".to_string(),
+                "10".to_string(),
+                "--retry-sleep".to_string(),
+                "exp=1:120".to_string(),
+                "--geo-bypass".to_string(),
+                "--no-check-certificate".to_string(),
+            ],
+        ];
 
-        if !output.status.success() {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to get video info: {}", error_msg));
+        for (i, mut strategy) in strategies.into_iter().enumerate() {
+            info!("Trying video info strategy {} of 3", i + 1);
+            strategy.push(url.to_string());
+            
+            let args_str: Vec<&str> = strategy.iter().map(|s| s.as_str()).collect();
+            
+            match self.execute_yt_dlp_command(&args_str).await {
+                Ok(output) if output.status.success() => {
+                    info!("Successfully got video info with strategy {}", i + 1);
+                    return self.parse_video_info(&output.stdout);
+                }
+                Ok(output) => {
+                    let error_msg = String::from_utf8_lossy(&output.stderr);
+                    warn!("Strategy {} failed: {}", i + 1, error_msg);
+                    
+                    // Add delay between strategies to avoid rate limiting
+                    if i < 2 {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                    }
+                }
+                Err(e) => {
+                    warn!("Strategy {} error: {}", i + 1, e);
+                }
+            }
         }
 
-        let json_str = String::from_utf8(output.stdout)?;
+        Err(anyhow!("All video info strategies failed. YouTube may be blocking requests."))
+    }
+
+    fn parse_video_info(&self, stdout: &[u8]) -> Result<VideoInfo> {
+        let json_str = String::from_utf8(stdout.to_vec())?;
         let json_value: serde_json::Value = serde_json::from_str(&json_str)?;
 
         Ok(VideoInfo {
@@ -277,91 +370,61 @@ impl YouTubeDownloader {
         // Create output directory
         fs::create_dir_all(&options.output_dir).await?;
 
-        // Use absolute path and escape spaces for Windows
+        // Use absolute path
         let output_dir = std::path::Path::new(&options.output_dir)
             .canonicalize()
             .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
 
-        // Render.com optimized bot protection (minimal, proven options only)
-        let bot_bypass_args = vec![
-            // Essential user agent spoofing (Linux for Render.com)
-            "--user-agent".to_string(),
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
-            // Basic headers that work reliably
-            "--add-header".to_string(),
-            "Accept-Language:en-US,en;q=0.9".to_string(),
-            // Conservative retry strategy for free tier
-            "--extractor-retries".to_string(),
-            "3".to_string(),
-            "--fragment-retries".to_string(),
-            "3".to_string(),
-            "--retry-sleep".to_string(),
-            "linear=2:10:20".to_string(),
-            // Essential bypass options that work on all systems
-            "--geo-bypass".to_string(),
-            "--no-check-certificate".to_string(),
-            "--ignore-errors".to_string(),
-        ];
+        // Use simple, proven approach that works both locally and hosted
+        self.download_video_simple(&options, &output_dir).await
+    }
 
-        let mut format_args = match options.format.as_str() {
+    fn build_format_args(&self, options: &ConversionOptions, output_dir: &std::path::Path) -> Result<Vec<String>> {
+        let format_args = match options.format.as_str() {
             "mp3" => {
-                // Download best audio in existing format, no conversion
                 vec![
-                    "--format".to_string(), "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio".to_string(),
-                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
-                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--format".to_string(), 
+                    "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio".to_string(),
+                    "--output".to_string(), 
+                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
                     "--no-playlist".to_string(),
                     "--no-post-overwrites".to_string(),
                 ]
             }
             "wav" => {
-                // Download audio in existing format, no conversion to WAV
                 vec![
-                    "--format".to_string(), "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio".to_string(),
-                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
-                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--format".to_string(), 
+                    "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio".to_string(),
+                    "--output".to_string(), 
+                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
                     "--no-playlist".to_string(),
                 ]
             }
             "mp4" => {
-                // Download MP4 directly without any processing
                 vec![
-                    "--format".to_string(), format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", 
-                        self.get_quality_height(&options.quality)),
-                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
-                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--format".to_string(), 
+                    format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", self.get_quality_height(&options.quality)),
+                    "--output".to_string(), 
+                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
                     "--no-playlist".to_string(),
                 ]
             }
             "webm" => {
-                // Download WebM directly
                 vec![
-                    "--format".to_string(), format!("best[ext=webm][height<={}]/best[ext=webm]/best", 
-                        self.get_quality_height(&options.quality)),
-                    "--output".to_string(), format!("{}/%(title).50s.%(ext)s", 
-                        output_dir.to_string_lossy().replace('\\', "/")),
+                    "--format".to_string(), 
+                    format!("best[ext=webm][height<={}]/best[ext=webm]/best", self.get_quality_height(&options.quality)),
+                    "--output".to_string(), 
+                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
                     "--no-playlist".to_string(),
                 ]
             }
             _ => return Err(anyhow!("Unsupported format: {}", options.format)),
         };
 
-        // Add bot protection bypass arguments to format args
-        format_args.extend(bot_bypass_args);
+        Ok(format_args)
+    }
 
-        let mut args: Vec<&str> = format_args.iter().map(|s| s.as_str()).collect();
-        args.push(&options.url);
-
-        info!("Executing yt-dlp with args: {:?}", args);
-        let output = self.execute_yt_dlp_command(&args).await?;
-
-        if !output.status.success() {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            let stdout_msg = String::from_utf8_lossy(&output.stdout);
-            return Err(anyhow!("Download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
-        }
-
-        // Find the downloaded file
+    async fn find_downloaded_file(&self, output_dir: &std::path::Path) -> Result<String> {
         let mut entries = fs::read_dir(&output_dir).await?;
         let mut newest_file = None;
         let mut newest_time = std::time::SystemTime::UNIX_EPOCH;
@@ -400,6 +463,11 @@ impl YouTubeDownloader {
             "{}/%(playlist_index)02d - %(title).50s.%(ext)s", 
             output_dir.to_string_lossy().replace('\\', "/")
         );
+
+        // Simplified approach for hosting environments
+        if std::env::var("RENDER").is_ok() {
+            return self.download_playlist_simple(&options, &output_dir, &output_pattern).await;
+        }
 
         // Render.com optimized bot protection (minimal, proven options only)
         let bot_bypass_args = vec![
@@ -612,6 +680,104 @@ impl YouTubeDownloader {
             info!("Successfully downloaded {} files from playlist", downloaded_files.len());
             Ok(downloaded_files)
         }
+    }
+
+    async fn download_playlist_simple(&self, options: &ConversionOptions, output_dir: &std::path::Path, output_pattern: &str) -> Result<Vec<String>> {
+        let format_arg = match options.format.as_str() {
+            "mp3" => "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio",
+            "wav" => "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio",
+            "mp4" => &format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", self.get_quality_height(&options.quality)),
+            "webm" => &format!("best[ext=webm][height<={}]/best[ext=webm]/best", self.get_quality_height(&options.quality)),
+            _ => return Err(anyhow!("Unsupported format: {}", options.format)),
+        };
+
+        let mut command = Command::new("yt-dlp");
+        command
+            .arg("--format").arg(format_arg)
+            .arg("--output").arg(output_pattern)
+            .arg("--yes-playlist")
+            .arg("--user-agent").arg("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+            .arg("--extractor-retries").arg("3")
+            .arg("--geo-bypass")
+            .arg("--ignore-errors")
+            .arg("--no-abort-on-error")
+            .arg(&options.url);
+
+        info!("Executing simplified yt-dlp playlist command for hosting");
+        let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
+
+        if !output.status.success() {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            let stdout_msg = String::from_utf8_lossy(&output.stdout);
+            return Err(anyhow!("Playlist download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
+        }
+
+        // Find downloaded files
+        self.find_downloaded_files(&output_dir, &options.format).await
+    }
+
+    async fn find_downloaded_files(&self, output_dir: &std::path::Path, format: &str) -> Result<Vec<String>> {
+        let mut entries = fs::read_dir(&output_dir).await?;
+        let mut downloaded_files = Vec::new();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_file() {
+                let file_name = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                
+                // Check if this is a newly downloaded file (has the expected extensions)
+                if file_name.ends_with(&format!(".{}", format)) ||
+                   file_name.ends_with(".mp3") || file_name.ends_with(".mp4") || 
+                   file_name.ends_with(".wav") || file_name.ends_with(".webm") ||
+                   file_name.ends_with(".m4a") {
+                    downloaded_files.push(path.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        if downloaded_files.is_empty() {
+            Err(anyhow!("No files downloaded for playlist in directory: {}", output_dir.display()))
+        } else {
+            downloaded_files.sort(); // Sort files for consistent ordering
+            info!("Successfully downloaded {} files from playlist", downloaded_files.len());
+            Ok(downloaded_files)
+        }
+    }
+
+    async fn download_video_simple(&self, options: &ConversionOptions, output_dir: &std::path::Path) -> Result<String> {
+        let format_arg = match options.format.as_str() {
+            "mp3" => "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio",
+            "wav" => "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio",
+            "mp4" => &format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", self.get_quality_height(&options.quality)),
+            "webm" => &format!("best[ext=webm][height<={}]/best[ext=webm]/best", self.get_quality_height(&options.quality)),
+            _ => return Err(anyhow!("Unsupported format: {}", options.format)),
+        };
+
+        let output_pattern = format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/"));
+
+        let mut command = Command::new("yt-dlp");
+        command
+            .arg("--format").arg(format_arg)
+            .arg("--output").arg(&output_pattern)
+            .arg("--no-playlist")
+            .arg("--user-agent").arg("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+            .arg("--extractor-retries").arg("5")
+            .arg("--geo-bypass")
+            .arg("--ignore-errors")
+            .arg(&options.url);
+
+        info!("Executing simplified yt-dlp command for hosting");
+        let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
+
+        if !output.status.success() {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            let stdout_msg = String::from_utf8_lossy(&output.stdout);
+            return Err(anyhow!("Download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
+        }
+
+        self.find_downloaded_file(&output_dir).await
     }
 
     fn get_quality_height(&self, quality: &str) -> String {

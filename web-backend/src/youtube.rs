@@ -152,14 +152,14 @@ impl YouTubeDownloader {
         let output = self.execute_yt_dlp_command(&[
             "--dump-json",
             "--no-download",
-            "--cookies-from-browser", "chrome",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--referer", "https://www.youtube.com/",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
             "--add-header", "Sec-Fetch-Dest:document",
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "5",
+            "--extractor-retries", "10",
+            "--geo-bypass",
             url,
         ]).await?;
 
@@ -188,14 +188,14 @@ impl YouTubeDownloader {
             "--dump-json",
             "--flat-playlist",
             "--no-download",
-            "--cookies-from-browser", "chrome",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--referer", "https://www.youtube.com/",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
             "--add-header", "Sec-Fetch-Dest:document",
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "5",
+            "--extractor-retries", "10",
+            "--geo-bypass",
             url,
         ]).await?;
 
@@ -245,14 +245,14 @@ impl YouTubeDownloader {
             "--list-formats",
             "--dump-json",
             "--no-download",
-            "--cookies-from-browser", "chrome",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "--referer", "https://www.youtube.com/",
             "--add-header", "Accept-Language:en-US,en;q=0.9",
             "--add-header", "Sec-Fetch-Dest:document",
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
-            "--extractor-retries", "5",
+            "--extractor-retries", "10",
+            "--geo-bypass",
             url,
         ]).await?;
 
@@ -291,11 +291,8 @@ impl YouTubeDownloader {
             .canonicalize()
             .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
 
-        // Advanced bot protection bypass arguments
+        // Advanced bot protection bypass arguments (production-safe)
         let bot_bypass_args = vec![
-            // Try to use cookies from installed browsers first
-            "--cookies-from-browser".to_string(),
-            "chrome".to_string(),
             // Advanced user agent with more realistic fingerprint
             "--user-agent".to_string(),
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
@@ -323,15 +320,19 @@ impl YouTubeDownloader {
             "Sec-Fetch-User:?1".to_string(),
             // Retry and rate limiting
             "--extractor-retries".to_string(),
-            "5".to_string(),
+            "10".to_string(),
             "--fragment-retries".to_string(),
-            "5".to_string(),
+            "10".to_string(),
             "--retry-sleep".to_string(),
-            "exp=1:60".to_string(),
+            "exp=1:120".to_string(),
             "--sleep-interval".to_string(),
-            "3".to_string(),
-            // Additional anti-detection measures (removed invalid --force-json)
-            "--no-check-certificate".to_string(),
+            "1".to_string(),
+            // Production-safe anti-detection measures
+            "--embed-chapters".to_string(),
+            "--embed-info-json".to_string(),
+            "--write-info-json".to_string(),
+            "--geo-bypass".to_string(),
+            "--mark-watched".to_string(),
         ];
 
         let mut format_args = match options.format.as_str() {
@@ -432,11 +433,8 @@ impl YouTubeDownloader {
             output_dir.to_string_lossy().replace('\\', "/")
         );
 
-        // Advanced bot protection bypass arguments
+        // Advanced bot protection bypass arguments (production-safe)
         let bot_bypass_args = vec![
-            // Try to use cookies from installed browsers first
-            "--cookies-from-browser".to_string(),
-            "chrome".to_string(),
             // Advanced user agent with more realistic fingerprint
             "--user-agent".to_string(),
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
@@ -464,15 +462,19 @@ impl YouTubeDownloader {
             "Sec-Fetch-User:?1".to_string(),
             // Retry and rate limiting
             "--extractor-retries".to_string(),
-            "5".to_string(),
+            "10".to_string(),
             "--fragment-retries".to_string(),
-            "5".to_string(),
+            "10".to_string(),
             "--retry-sleep".to_string(),
-            "exp=1:60".to_string(),
+            "exp=1:120".to_string(),
             "--sleep-interval".to_string(),
-            "3".to_string(),
-            // Additional anti-detection measures (removed invalid options)
-            "--no-check-certificate".to_string(),
+            "1".to_string(),
+            // Production-safe anti-detection measures
+            "--embed-chapters".to_string(),
+            "--embed-info-json".to_string(),
+            "--write-info-json".to_string(),
+            "--geo-bypass".to_string(),
+            "--mark-watched".to_string(),
         ];
 
         // First, get playlist info to know how many videos we're dealing with

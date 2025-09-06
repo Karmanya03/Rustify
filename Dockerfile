@@ -23,12 +23,18 @@ RUN cargo build --release
 # Stage 2: Runtime image
 FROM debian:bullseye-slim AS runtime
 
-# Install runtime dependencies
+# Install runtime dependencies including Python and yt-dlp
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl1.1 \
     curl \
+    python3 \
+    python3-pip \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install yt-dlp
+RUN pip3 install --no-cache-dir yt-dlp
 
 # Create app user for security
 RUN useradd -r -s /bin/false rustify

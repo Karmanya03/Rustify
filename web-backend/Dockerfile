@@ -13,12 +13,18 @@ RUN cargo build --release
 # Runtime stage with minimal image
 FROM debian:bookworm-slim
 
-# Install necessary runtime dependencies
+# Install necessary runtime dependencies including Python and yt-dlp
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     pkg-config \
     libssl-dev \
+    python3 \
+    python3-pip \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install yt-dlp
+RUN pip3 install --no-cache-dir yt-dlp
 
 # Set working directory
 WORKDIR /app

@@ -48,7 +48,6 @@ pub struct ConversionOptions {
 #[derive(Debug, Clone)]
 pub struct YouTubeDownloader {
     pub yt_dlp_path: String,
-    pub use_po_token: bool,
 }
 
 impl YouTubeDownloader {
@@ -64,7 +63,6 @@ impl YouTubeDownloader {
         
         Self {
             yt_dlp_path,
-            use_po_token: false, // Will enable when needed
         }
     }
 
@@ -377,51 +375,6 @@ impl YouTubeDownloader {
 
         // Use simple, proven approach that works both locally and hosted
         self.download_video_simple(&options, &output_dir).await
-    }
-
-    fn build_format_args(&self, options: &ConversionOptions, output_dir: &std::path::Path) -> Result<Vec<String>> {
-        let format_args = match options.format.as_str() {
-            "mp3" => {
-                vec![
-                    "--format".to_string(), 
-                    "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio".to_string(),
-                    "--output".to_string(), 
-                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
-                    "--no-playlist".to_string(),
-                    "--no-post-overwrites".to_string(),
-                ]
-            }
-            "wav" => {
-                vec![
-                    "--format".to_string(), 
-                    "bestaudio[ext=wav]/bestaudio[ext=m4a]/bestaudio".to_string(),
-                    "--output".to_string(), 
-                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
-                    "--no-playlist".to_string(),
-                ]
-            }
-            "mp4" => {
-                vec![
-                    "--format".to_string(), 
-                    format!("best[ext=mp4][height<={}]/best[ext=mp4]/best", self.get_quality_height(&options.quality)),
-                    "--output".to_string(), 
-                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
-                    "--no-playlist".to_string(),
-                ]
-            }
-            "webm" => {
-                vec![
-                    "--format".to_string(), 
-                    format!("best[ext=webm][height<={}]/best[ext=webm]/best", self.get_quality_height(&options.quality)),
-                    "--output".to_string(), 
-                    format!("{}/%(title).50s.%(ext)s", output_dir.to_string_lossy().replace('\\', "/")),
-                    "--no-playlist".to_string(),
-                ]
-            }
-            _ => return Err(anyhow!("Unsupported format: {}", options.format)),
-        };
-
-        Ok(format_args)
     }
 
     async fn find_downloaded_file(&self, output_dir: &std::path::Path) -> Result<String> {

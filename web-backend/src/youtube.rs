@@ -295,6 +295,8 @@ impl YouTubeDownloader {
             "3".to_string(),
             "--retry-sleep".to_string(),
             "linear=1:5:10".to_string(),
+            "--sleep-interval".to_string(),
+            "2".to_string(),
         ];
 
         let mut format_args = match options.format.as_str() {
@@ -411,6 +413,8 @@ impl YouTubeDownloader {
             "3".to_string(),
             "--retry-sleep".to_string(),
             "linear=1:5:10".to_string(),
+            "--sleep-interval".to_string(),
+            "2".to_string(),
         ];
 
         // First, get playlist info to know how many videos we're dealing with

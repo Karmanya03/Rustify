@@ -41,7 +41,13 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                         break;
                     }
                     Some(Err(e)) => {
-                        error!("WebSocket error: {}", e);
+                        // Check if it's a normal connection reset (user closed browser)
+                        let error_msg = e.to_string();
+                        if error_msg.contains("Connection reset") || error_msg.contains("close handshake") {
+                            info!("WebSocket client disconnected (browser closed): {}", e);
+                        } else {
+                            error!("WebSocket error: {}", e);
+                        }
                         break;
                     }
                     None => break,

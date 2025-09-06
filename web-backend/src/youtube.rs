@@ -152,6 +152,10 @@ impl YouTubeDownloader {
         let output = self.execute_yt_dlp_command(&[
             "--dump-json",
             "--no-download",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "--referer", "https://www.youtube.com/",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--extractor-retries", "3",
             url,
         ]).await?;
 
@@ -180,6 +184,10 @@ impl YouTubeDownloader {
             "--dump-json",
             "--flat-playlist",
             "--no-download",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "--referer", "https://www.youtube.com/",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--extractor-retries", "3",
             url,
         ]).await?;
 
@@ -229,6 +237,10 @@ impl YouTubeDownloader {
             "--list-formats",
             "--dump-json",
             "--no-download",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "--referer", "https://www.youtube.com/",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--extractor-retries", "3",
             url,
         ]).await?;
 
@@ -267,7 +279,25 @@ impl YouTubeDownloader {
             .canonicalize()
             .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
 
-        let format_args = match options.format.as_str() {
+        // Add bot protection bypass arguments
+        let bot_bypass_args = vec![
+            "--user-agent".to_string(),
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
+            "--referer".to_string(),
+            "https://www.youtube.com/".to_string(),
+            "--add-header".to_string(),
+            "Accept-Language:en-US,en;q=0.9".to_string(),
+            "--add-header".to_string(),
+            "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8".to_string(),
+            "--extractor-retries".to_string(),
+            "3".to_string(),
+            "--fragment-retries".to_string(),
+            "3".to_string(),
+            "--retry-sleep".to_string(),
+            "linear=1:5:10".to_string(),
+        ];
+
+        let mut format_args = match options.format.as_str() {
             "mp3" => {
                 // Download best audio in existing format, no conversion
                 vec![
@@ -309,6 +339,9 @@ impl YouTubeDownloader {
             }
             _ => return Err(anyhow!("Unsupported format: {}", options.format)),
         };
+
+        // Add bot protection bypass arguments to format args
+        format_args.extend(bot_bypass_args);
 
         let mut args: Vec<&str> = format_args.iter().map(|s| s.as_str()).collect();
         args.push(&options.url);
@@ -362,14 +395,37 @@ impl YouTubeDownloader {
             output_dir.to_string_lossy().replace('\\', "/")
         );
 
+        // Add bot protection bypass arguments
+        let bot_bypass_args = vec![
+            "--user-agent".to_string(),
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36".to_string(),
+            "--referer".to_string(),
+            "https://www.youtube.com/".to_string(),
+            "--add-header".to_string(),
+            "Accept-Language:en-US,en;q=0.9".to_string(),
+            "--add-header".to_string(),
+            "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8".to_string(),
+            "--extractor-retries".to_string(),
+            "3".to_string(),
+            "--fragment-retries".to_string(),
+            "3".to_string(),
+            "--retry-sleep".to_string(),
+            "linear=1:5:10".to_string(),
+        ];
+
         // First, get playlist info to know how many videos we're dealing with
-        let info_args = vec![
+        let mut info_args = vec![
             "--dump-json",
             "--flat-playlist",
             "--playlist-end",
             "1",
-            &options.url
         ];
+        
+        // Add bot bypass args to info command
+        for arg in &bot_bypass_args {
+            info_args.push(arg.as_str());
+        }
+        info_args.push(&options.url);
         
         info!("Getting playlist info with args: {:?}", info_args);
         let info_output = self.execute_yt_dlp_command(&info_args).await?;
@@ -387,7 +443,7 @@ impl YouTubeDownloader {
         
         info!("Playlist contains approximately {} videos", video_count);
 
-        let format_args = match options.format.as_str() {
+        let mut format_args = match options.format.as_str() {
             "mp3" => {
                 // Download best audio in existing format, no conversion
                 vec![
@@ -433,6 +489,9 @@ impl YouTubeDownloader {
             }
             _ => return Err(anyhow!("Unsupported format: {}", options.format)),
         };
+
+        // Add bot protection bypass arguments to format args
+        format_args.extend(bot_bypass_args);
 
         let mut args: Vec<&str> = format_args.iter().map(|s| s.as_str()).collect();
         args.push(&options.url);

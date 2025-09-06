@@ -160,7 +160,6 @@ impl YouTubeDownloader {
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
             "--extractor-retries", "5",
-            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -197,7 +196,6 @@ impl YouTubeDownloader {
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
             "--extractor-retries", "5",
-            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -255,7 +253,6 @@ impl YouTubeDownloader {
             "--add-header", "Sec-Fetch-Mode:navigate",
             "--add-header", "Sec-Fetch-Site:none",
             "--extractor-retries", "5",
-            "--no-check-certificate",
             url,
         ]).await?;
 
@@ -333,10 +330,8 @@ impl YouTubeDownloader {
             "exp=1:60".to_string(),
             "--sleep-interval".to_string(),
             "3".to_string(),
-            // Additional anti-detection measures
-            "--force-json".to_string(),
+            // Additional anti-detection measures (removed invalid --force-json)
             "--no-check-certificate".to_string(),
-            "--prefer-free-formats".to_string(),
         ];
 
         let mut format_args = match options.format.as_str() {
@@ -476,10 +471,8 @@ impl YouTubeDownloader {
             "exp=1:60".to_string(),
             "--sleep-interval".to_string(),
             "3".to_string(),
-            // Additional anti-detection measures
-            "--force-json".to_string(),
+            // Additional anti-detection measures (removed invalid options)
             "--no-check-certificate".to_string(),
-            "--prefer-free-formats".to_string(),
         ];
 
         // First, get playlist info to know how many videos we're dealing with

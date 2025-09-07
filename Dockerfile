@@ -103,26 +103,6 @@ COPY dist ./dist
 # Create necessary directories
 RUN mkdir -p /app/logs /app/downloads
 
-# Set ownership
-RUN chown -R rustify:rustify /app
-
-# Switch to app user
-USER rustify
-
-# Expose port
-EXPOSE 10000
-
-# Health check - using wget instead of curl for lighter image
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD timeout 3 bash -c "</dev/tcp/localhost/10000" || exit 1
-
-# Set environment variables
-ENV RUST_LOG=info
-ENV HOST=0.0.0.0
-ENV PORT=10000
-ENV USE_SELENIUM=true
-ENV DISPLAY=:99
-
 # Create a startup script for proper initialization
 COPY <<EOF /app/startup.sh
 #!/bin/bash
@@ -149,8 +129,28 @@ trap cleanup EXIT INT TERM
 exec ./rustify-server
 EOF
 
-# Make startup script executable
+# Make startup script executable (must be done before USER directive)
 RUN chmod +x /app/startup.sh
+
+# Set ownership
+RUN chown -R rustify:rustify /app
+
+# Switch to app user
+USER rustify
+
+# Expose port
+EXPOSE 10000
+
+# Health check - using wget instead of curl for lighter image
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD timeout 3 bash -c "</dev/tcp/localhost/10000" || exit 1
+
+# Set environment variables
+ENV RUST_LOG=info
+ENV HOST=0.0.0.0
+ENV PORT=10000
+ENV USE_SELENIUM=true
+ENV DISPLAY=:99
 
 # Start the application using the startup script
 CMD ["/app/startup.sh"]

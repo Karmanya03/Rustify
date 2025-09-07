@@ -141,32 +141,40 @@ pub async fn download_video(options: ConversionOptions) -> Result<String> {
         command.arg(arg);
     }
     
-    // Enhanced bot protection arguments
+    // Enhanced bot protection arguments - MAXIMUM AGGRESSION
     command
         .arg("--format").arg(&format_arg)
         .arg("--output").arg(&output_pattern)
         .arg("--no-playlist")
-        // Bot protection & cookies
-        .arg("--cookies-from-browser").arg("chrome")  // Try to use Chrome cookies first
+        // Cookie strategies (try Chrome first, fallback to others)
+        .arg("--cookies-from-browser").arg("chrome,firefox,edge,safari")  // Try multiple browsers
         .arg("--user-agent").arg("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        // Additional headers to appear more like a real browser
+        // Comprehensive browser headers
         .arg("--add-header").arg("Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-        .arg("--add-header").arg("Accept-Language:en-US,en;q=0.5")
+        .arg("--add-header").arg("Accept-Language:en-US,en;q=0.9")
         .arg("--add-header").arg("Accept-Encoding:gzip, deflate, br")
+        .arg("--add-header").arg("DNT:1")
+        .arg("--add-header").arg("Connection:keep-alive")
+        .arg("--add-header").arg("Upgrade-Insecure-Requests:1")
         .arg("--add-header").arg("Sec-Fetch-Dest:document")
         .arg("--add-header").arg("Sec-Fetch-Mode:navigate")
         .arg("--add-header").arg("Sec-Fetch-Site:none")
-        .arg("--add-header").arg("Upgrade-Insecure-Requests:1")
-        // Retry and delay settings
-        .arg("--extractor-retries").arg("10")
-        .arg("--sleep-requests").arg("1")    // Wait 1 second between requests
-        .arg("--sleep-interval").arg("5")    // Wait 5 seconds on errors
-        .arg("--max-sleep-interval").arg("30") // Maximum wait time
+        .arg("--add-header").arg("Sec-Fetch-User:?1")
+        .arg("--add-header").arg("Cache-Control:max-age=0")
+        // Advanced retry and timing
+        .arg("--extractor-retries").arg("15")  // More retries
+        .arg("--sleep-requests").arg("1")      // Wait between requests
+        .arg("--sleep-interval").arg("3")      // Wait on errors  
+        .arg("--max-sleep-interval").arg("15") // Max wait time
+        .arg("--retries").arg("10")            // Connection retries
         // Bypass mechanisms
         .arg("--geo-bypass")
+        .arg("--geo-bypass-country").arg("US") // Try US bypass
         .arg("--ignore-errors")
-        // Age verification bypass
-        .arg("--age-limit").arg("0")         // Bypass age restrictions
+        .arg("--no-check-certificate")         // Ignore SSL issues
+        // Age and access controls
+        .arg("--age-limit").arg("0")           // Bypass age restrictions
+        .arg("--extractor-args").arg("youtube:player_client=web") // Use web client
         .arg(&options.url);
 
     info!("Executing yt-dlp with enhanced bot protection");
@@ -196,21 +204,56 @@ async fn try_alternative_download(
     output_pattern: &str, 
     format_arg: &str
 ) -> Result<String> {
-    let strategies = [
-        // Strategy 1: Try Firefox cookies
-        vec!["--cookies-from-browser", "firefox"],
-        // Strategy 2: Try Edge cookies
-        vec!["--cookies-from-browser", "edge"],
-        // Strategy 3: Use alternative extractor options
-        vec!["--extractor-args", "youtube:player_client=android"],
-        // Strategy 4: Use mobile user agent
-        vec!["--user-agent", "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"],
-        // Strategy 5: Try with different client
-        vec!["--extractor-args", "youtube:player_client=web"],
+    let advanced_strategies = [
+        // Strategy 1: Try bypass with embedded player
+        vec!["--extractor-args", "youtube:player_client=web_embedded", "--referer", "https://www.youtube.com/"],
+        
+        // Strategy 2: Use TV client (often works when web fails)
+        vec!["--extractor-args", "youtube:player_client=tv", "--user-agent", "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1"],
+        
+        // Strategy 3: iOS client simulation
+        vec!["--extractor-args", "youtube:player_client=ios", "--user-agent", "com.google.ios.youtube/17.49.4 (iPhone; U; CPU OS 14_2 like Mac OS X)"],
+        
+        // Strategy 4: Android client with specific version
+        vec!["--extractor-args", "youtube:player_client=android", "--user-agent", "com.google.android.youtube/17.49.4 (Linux; U; Android 11) gzip"],
+        
+        // Strategy 5: Try with Firefox cookies + specific client
+        vec!["--cookies-from-browser", "firefox", "--extractor-args", "youtube:player_client=web"],
+        
+        // Strategy 6: Use age-restricted bypass
+        vec!["--extractor-args", "youtube:skip=translated_subs", "--age-limit", "0"],
+        
+        // Strategy 7: Force IPv4 (sometimes IPv6 is blocked)
+        vec!["--force-ipv4", "--extractor-args", "youtube:player_client=web"],
+        
+        // Strategy 8: Use proxy-like headers
+        vec![
+            "--add-header", "X-Forwarded-For:8.8.8.8",
+            "--add-header", "X-Real-IP:8.8.8.8", 
+            "--extractor-args", "youtube:player_client=web"
+        ],
+        
+        // Strategy 9: Simulate older browser
+        vec![
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36",
+            "--extractor-args", "youtube:player_client=web"
+        ],
+        
+        // Strategy 10: Use minimal extraction (fastest, sometimes bypasses checks)
+        vec!["--no-check-certificate", "--prefer-insecure", "--extractor-args", "youtube:player_client=web_embedded"],
+        
+        // Strategy 11: Try with different locale
+        vec![
+            "--add-header", "Accept-Language:en-GB,en;q=0.9",
+            "--extractor-args", "youtube:player_client=web,youtube:lang=en"
+        ],
+        
+        // Strategy 12: Aggressive retry with backoff
+        vec!["--retries", "15", "--retry-sleep", "exponential:1:5:10", "--extractor-args", "youtube:player_client=android"],
     ];
 
-    for (i, strategy) in strategies.iter().enumerate() {
-        info!("Trying alternative strategy {}: {:?}", i + 1, strategy);
+    for (i, strategy) in advanced_strategies.iter().enumerate() {
+        info!("Trying advanced strategy {}: {:?}", i + 1, strategy);
         
         let mut command = Command::new(&yt_dlp_cmd[0]);
         
@@ -224,10 +267,10 @@ async fn try_alternative_download(
             .arg("--format").arg(format_arg)
             .arg("--output").arg(output_pattern)
             .arg("--no-playlist")
-            .arg("--extractor-retries").arg("5")
-            .arg("--sleep-requests").arg("2")
             .arg("--geo-bypass")
-            .arg("--ignore-errors");
+            .arg("--ignore-errors")
+            .arg("--no-warnings")
+            .arg("--quiet");  // Reduce output for cleaner logs
             
         // Add strategy-specific arguments
         for arg in strategy {
@@ -236,21 +279,122 @@ async fn try_alternative_download(
         
         command.arg(&options.url);
 
-        let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
+        // Add longer timeout for difficult videos
+        let output = tokio::time::timeout(
+            std::time::Duration::from_secs(120), // 2 minute timeout
+            command.output()
+        ).await;
 
-        if output.status.success() {
-            info!("Alternative strategy {} succeeded!", i + 1);
-            let output_dir = std::path::Path::new(&options.output_dir)
-                .canonicalize()
-                .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
-            return find_downloaded_file(&output_dir).await;
-        } else {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            warn!("Strategy {} failed: {}", i + 1, error_msg);
+        match output {
+            Ok(Ok(process_output)) if process_output.status.success() => {
+                info!("🎉 Advanced strategy {} SUCCEEDED!", i + 1);
+                let output_dir = std::path::Path::new(&options.output_dir)
+                    .canonicalize()
+                    .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
+                return find_downloaded_file(&output_dir).await;
+            },
+            Ok(Ok(process_output)) => {
+                let error_msg = String::from_utf8_lossy(&process_output.stderr);
+                warn!("Strategy {} failed: {}", i + 1, error_msg);
+                
+                // Add delay between attempts to avoid rate limiting
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            },
+            Ok(Err(e)) => {
+                warn!("Strategy {} execution error: {}", i + 1, e);
+            },
+            Err(_) => {
+                warn!("Strategy {} timed out after 2 minutes", i + 1);
+            }
         }
     }
 
-    Err(anyhow!("All bot protection strategies failed. YouTube may be blocking automated access."))
+    // Last resort: Try the nuclear option - completely different approach
+    info!("🚨 Trying NUCLEAR OPTION - minimal extraction");
+    try_nuclear_option(yt_dlp_cmd, options, output_pattern, format_arg).await
+}
+
+// Nuclear option: Minimal extraction with maximum compatibility
+async fn try_nuclear_option(
+    yt_dlp_cmd: &[String], 
+    options: &ConversionOptions, 
+    output_pattern: &str, 
+    _format_arg: &str
+) -> Result<String> {
+    let mut command = Command::new(&yt_dlp_cmd[0]);
+    
+    // Add base yt-dlp arguments
+    for arg in &yt_dlp_cmd[1..] {
+        command.arg(arg);
+    }
+    
+    // Nuclear option: Use the most compatible settings possible
+    command
+        .arg("--format").arg("best/worst")  // Accept any quality
+        .arg("--output").arg(output_pattern)
+        .arg("--no-playlist")
+        .arg("--no-check-certificate")
+        .arg("--prefer-insecure")
+        .arg("--ignore-errors")
+        .arg("--no-warnings")
+        .arg("--extract-flat")  // Minimal extraction
+        .arg("--skip-download")  // Just get info first
+        .arg(&options.url);
+
+    info!("🔥 NUCLEAR OPTION: Testing video accessibility");
+    let test_output = command.output().await;
+    
+    match test_output {
+        Ok(output) if output.status.success() => {
+            info!("✅ Video is accessible, proceeding with nuclear download");
+            
+            // Now try actual download with minimal options
+            let mut download_command = Command::new(&yt_dlp_cmd[0]);
+            for arg in &yt_dlp_cmd[1..] {
+                download_command.arg(arg);
+            }
+            
+            download_command
+                .arg("--format").arg("worst")  // Lowest quality for maximum compatibility
+                .arg("--output").arg(output_pattern)
+                .arg("--no-playlist")
+                .arg("--no-check-certificate")
+                .arg("--prefer-insecure")
+                .arg("--ignore-errors")
+                .arg("--extractor-args").arg("youtube:player_client=web_embedded")
+                .arg(&options.url);
+                
+            let final_output = download_command.output().await.map_err(|e| anyhow!("Nuclear download failed: {}", e))?;
+            
+            if final_output.status.success() {
+                info!("🎊 NUCLEAR OPTION SUCCEEDED!");
+                let output_dir = std::path::Path::new(&options.output_dir)
+                    .canonicalize()
+                    .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
+                return find_downloaded_file(&output_dir).await;
+            }
+        },
+        _ => {
+            let error_msg = test_output.map(|o| String::from_utf8_lossy(&o.stderr).to_string())
+                .unwrap_or_else(|e| format!("Command execution failed: {}", e));
+            warn!("Nuclear test failed: {}", error_msg);
+        }
+    }
+
+    Err(anyhow!(
+        "🚫 ALL STRATEGIES EXHAUSTED: YouTube is aggressively blocking this video.\n\
+        Attempted 12 advanced strategies + nuclear option.\n\
+        This might be:\n\
+        1. Region-locked content\n\
+        2. Age-restricted content requiring account\n\
+        3. Recently uploaded content with enhanced protection\n\
+        4. YouTube actively blocking your IP range\n\
+        \n\
+        Suggestions:\n\
+        - Try a different video\n\
+        - Check if video is publicly accessible in browser\n\
+        - Video might be region-locked or private"
+    ))
 }
 
 async fn find_downloaded_file(output_dir: &std::path::Path) -> Result<String> {

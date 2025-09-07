@@ -172,20 +172,27 @@ impl SeleniumExtractor {
             }
         }
 
-        // Check if Chrome/Chromium is available
-        let chrome_check = Command::new("chromium")
-            .args(["--version"])
-            .output()
-            .await;
-
-        match chrome_check {
-            Ok(output) if output.status.success() => {
-                let version = String::from_utf8_lossy(&output.stdout);
-                info!("Chrome/Chromium available: {}", version.trim());
+        // Check if Chrome/Chromium is available (try multiple possible executables)
+        let chrome_commands = ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"];
+        let mut chrome_found = false;
+        
+        for cmd in &chrome_commands {
+            if let Ok(output) = Command::new(cmd)
+                .args(["--version"])
+                .output()
+                .await
+            {
+                if output.status.success() {
+                    let version = String::from_utf8_lossy(&output.stdout);
+                    info!("Chrome/Chromium available: {}", version.trim());
+                    chrome_found = true;
+                    break;
+                }
             }
-            _ => {
-                warn!("Chrome/Chromium not found, Selenium may not work");
-            }
+        }
+        
+        if !chrome_found {
+            warn!("Chrome/Chromium not found, Selenium may not work");
         }
 
         info!("Selenium dependencies check completed");

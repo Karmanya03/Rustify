@@ -46,8 +46,9 @@ pub struct ConversionOptions {
 
 // Simple function to get the right yt-dlp command
 fn get_yt_dlp_command() -> Vec<String> {
-    // For hosting environments (Render.com, production), use direct yt-dlp
+    // For hosting environments (Render.com, Koyeb, Railway, production), use direct yt-dlp
     if std::env::var("RENDER").is_ok() || 
+       std::env::var("KOYEB").is_ok() ||
        std::env::var("NODE_ENV").map_or(false, |v| v == "production") ||
        std::env::var("RAILWAY_ENVIRONMENT").is_ok() {
         return vec!["yt-dlp".to_string()];

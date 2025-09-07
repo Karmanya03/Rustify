@@ -34,8 +34,13 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp - simplified approach that works
-RUN python3 -m pip install --no-cache-dir --break-system-packages yt-dlp
+# Create virtual environment and install yt-dlp with latest version
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir yt-dlp
+
+# Add virtual environment to PATH
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Create app user for security
 RUN useradd -r -s /bin/false rustify

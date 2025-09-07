@@ -2,14 +2,12 @@ use std::collections::HashMap;
 use tokio::sync::{Mutex, broadcast};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use crate::youtube::YouTubeDownloader;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub tasks: Arc<Mutex<HashMap<String, TaskResponse>>>,
     pub task_updates: broadcast::Sender<TaskUpdate>,
-    pub youtube_downloader: Arc<YouTubeDownloader>,
     pub downloads_dir: String,
 }
 
@@ -49,10 +47,9 @@ pub enum TaskStatus {
 impl AppState {
     pub async fn new() -> anyhow::Result<Self> {
         let (task_updates, _) = broadcast::channel(100);
-        let youtube_downloader = Arc::new(YouTubeDownloader::new());
         
         // Simple dependency check without extra warnings
-        if let Err(e) = youtube_downloader.check_dependencies().await {
+        if let Err(e) = crate::youtube::check_dependencies().await {
             tracing::warn!("YouTube downloader dependencies check failed: {}", e);
         }
         
@@ -65,7 +62,6 @@ impl AppState {
         Ok(Self {
             tasks: Arc::new(Mutex::new(HashMap::new())),
             task_updates,
-            youtube_downloader,
             downloads_dir,
         })
     }

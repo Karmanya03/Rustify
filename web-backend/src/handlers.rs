@@ -70,8 +70,8 @@ pub async fn health_check() -> impl IntoResponse {
 }
 
 // Dependency check endpoint
-pub async fn dependency_check(State(state): State<AppState>) -> impl IntoResponse {
-    match state.youtube_downloader.check_dependencies().await {
+pub async fn dependency_check() -> impl IntoResponse {
+    match crate::youtube::check_dependencies().await {
         Ok(()) => {
             Json(serde_json::json!({
                 "status": "ok",
@@ -93,14 +93,13 @@ pub async fn dependency_check(State(state): State<AppState>) -> impl IntoRespons
 
 // Get video information
 pub async fn get_video_info(
-    State(state): State<AppState>,
     Json(request): Json<VideoInfoRequest>,
 ) -> Result<Json<VideoInfo>, Response> {
     info!("Getting video info for URL: {}", request.url);
     
     // Check if it's a playlist URL
     if request.url.contains("playlist?list=") {
-        match state.youtube_downloader.get_playlist_info(&request.url).await {
+        match crate::youtube::get_playlist_info(&request.url).await {
             Ok(playlist_info) => {
                 return Ok(Json(VideoInfo {
                     title: format!("{} (Playlist - {} videos)", playlist_info.title, playlist_info.video_count),
@@ -121,7 +120,7 @@ pub async fn get_video_info(
     }
     
     // Single video
-    match state.youtube_downloader.get_video_info(&request.url).await {
+    match crate::youtube::get_video_info(&request.url).await {
         Ok(video_info) => {
             Ok(Json(VideoInfo {
                 title: video_info.title,
@@ -143,10 +142,9 @@ pub async fn get_video_info(
 
 // Get quality options for a video
 pub async fn get_quality_options(
-    State(state): State<AppState>,
     Json(request): Json<VideoInfoRequest>,
 ) -> Result<Json<QualityOptions>, Response> {
-    match state.youtube_downloader.get_available_formats(&request.url).await {
+    match crate::youtube::get_formats(&request.url).await {
         Ok(formats) => {
             let format_options: Vec<FormatOption> = formats.into_iter().map(|f| FormatOption {
                 format_id: f.format_id,
@@ -270,7 +268,7 @@ pub async fn start_conversion(
         });
 
         // Perform actual download
-        match state_clone.youtube_downloader.download_video(conversion_options).await {
+        match crate::youtube::download_video(conversion_options).await {
             Ok(file_path) => {
                 // Cancel progress simulation
                 progress_task.abort();
@@ -444,7 +442,7 @@ pub async fn convert_playlist(
         });
 
         // Perform actual playlist download with enhanced error handling
-        match state_clone.youtube_downloader.download_playlist(conversion_options).await {
+        match crate::youtube::download_playlist(conversion_options).await {
             Ok(file_paths) => {
                 // Cancel progress simulation
                 progress_task.abort();

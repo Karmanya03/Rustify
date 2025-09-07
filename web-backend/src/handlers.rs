@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -608,7 +608,7 @@ pub async fn download_file(
     };
 
     // Check if file exists
-    if !tokio::fs::metadata(&file_path).await.is_ok() {
+    if tokio::fs::metadata(&file_path).await.is_err() {
         return Err((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -712,7 +712,7 @@ pub async fn download_playlist_file(
     };
 
     // Check if file exists
-    if !tokio::fs::metadata(&file_path).await.is_ok() {
+    if tokio::fs::metadata(&file_path).await.is_err() {
         return Err((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -768,4 +768,185 @@ pub async fn download_playlist_file(
         ],
         body,
     ).into_response())
+}
+
+// Clear completed tasks and their associated files
+pub async fn clear_completed_tasks(State(state): State<AppState>) -> impl IntoResponse {
+    info!("Starting cleanup of completed tasks");
+    
+    let mut tasks_to_clear = Vec::new();
+    let mut files_to_delete = Vec::new();
+    
+    // Collect completed tasks
+    {
+        let tasks = state.tasks.lock().await;
+        for (task_id, task) in tasks.iter() {
+            if task.status == "completed" || task.status.starts_with("failed") || task.status.starts_with("completed_with_errors") {
+                tasks_to_clear.push(task_id.clone());
+                if let Some(file_path) = &task.file_path {
+                    files_to_delete.push(file_path.clone());
+                }
+                if let Some(playlist_files) = &task.playlist_files {
+                    files_to_delete.extend(playlist_files.clone());
+                }
+            }
+        }
+    }
+    
+    let mut cleared_count = 0;
+    let mut file_deletion_errors = Vec::new();
+    
+    // Remove completed tasks from memory
+    {
+        let mut tasks = state.tasks.lock().await;
+        for task_id in &tasks_to_clear {
+            if tasks.remove(task_id).is_some() {
+                cleared_count += 1;
+            }
+        }
+    }
+    
+    // Delete associated files
+    for file_path in files_to_delete {
+        match tokio::fs::remove_file(&file_path).await {
+            Ok(_) => {
+                info!("Successfully deleted file: {}", file_path);
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to delete file {}: {}", file_path, e);
+                tracing::warn!("{}", error_msg);
+                file_deletion_errors.push(error_msg);
+            }
+        }
+    }
+    
+    // Also clean up temporary directories if empty
+    if let Err(e) = cleanup_empty_directories(&state.downloads_dir).await {
+        tracing::warn!("Failed to cleanup empty directories: {}", e);
+    }
+    
+    let response = serde_json::json!({
+        "message": "Completed tasks cleared successfully",
+        "cleared_count": cleared_count,
+        "file_deletion_errors": file_deletion_errors,
+        "status": "success"
+    });
+    
+    info!("Cleared {} completed tasks", cleared_count);
+    Json(response)
+}
+
+// Clear all tasks (including running ones) - Admin function
+pub async fn clear_all_tasks(State(state): State<AppState>) -> impl IntoResponse {
+    info!("Starting cleanup of ALL tasks (Admin operation)");
+    
+    let mut files_to_delete = Vec::new();
+    let task_count;
+    
+    // Collect all tasks and their files
+    {
+        let tasks = state.tasks.lock().await;
+        task_count = tasks.len();
+        
+        for task in tasks.values() {
+            if let Some(file_path) = &task.file_path {
+                files_to_delete.push(file_path.clone());
+            }
+            if let Some(playlist_files) = &task.playlist_files {
+                files_to_delete.extend(playlist_files.clone());
+            }
+        }
+    }
+    
+    // Clear all tasks from memory
+    {
+        let mut tasks = state.tasks.lock().await;
+        tasks.clear();
+    }
+    
+    let mut file_deletion_errors = Vec::new();
+    
+    // Delete all associated files
+    for file_path in files_to_delete {
+        match tokio::fs::remove_file(&file_path).await {
+            Ok(_) => {
+                info!("Successfully deleted file: {}", file_path);
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to delete file {}: {}", file_path, e);
+                tracing::warn!("{}", error_msg);
+                file_deletion_errors.push(error_msg);
+            }
+        }
+    }
+    
+    // Clean up all temporary directories
+    if let Err(e) = cleanup_all_directories(&state.downloads_dir).await {
+        tracing::warn!("Failed to cleanup directories: {}", e);
+    }
+    
+    let response = serde_json::json!({
+        "message": "All tasks cleared successfully",
+        "cleared_count": task_count,
+        "file_deletion_errors": file_deletion_errors,
+        "status": "success"
+    });
+    
+    info!("Cleared {} total tasks", task_count);
+    Json(response)
+}
+
+// Helper function to clean up empty directories
+async fn cleanup_empty_directories(downloads_dir: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let downloads_path = std::path::Path::new(downloads_dir);
+    
+    if !downloads_path.exists() {
+        return Ok(());
+    }
+    
+    let mut entries = tokio::fs::read_dir(downloads_path).await?;
+    
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        
+        if path.is_dir() {
+            // Check if directory is empty
+            let mut dir_entries = tokio::fs::read_dir(&path).await?;
+            if dir_entries.next_entry().await?.is_none() {
+                // Directory is empty, remove it
+                if let Err(e) = tokio::fs::remove_dir(&path).await {
+                    tracing::warn!("Failed to remove empty directory {:?}: {}", path, e);
+                } else {
+                    info!("Removed empty directory: {:?}", path);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+// Helper function to clean up all directories (Admin function)
+async fn cleanup_all_directories(downloads_dir: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let downloads_path = std::path::Path::new(downloads_dir);
+    
+    if !downloads_path.exists() {
+        return Ok(());
+    }
+    
+    let mut entries = tokio::fs::read_dir(downloads_path).await?;
+    
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        
+        if path.is_dir() {
+            if let Err(e) = tokio::fs::remove_dir_all(&path).await {
+                tracing::warn!("Failed to remove directory {:?}: {}", path, e);
+            } else {
+                info!("Removed directory: {:?}", path);
+            }
+        }
+    }
+    
+    Ok(())
 }

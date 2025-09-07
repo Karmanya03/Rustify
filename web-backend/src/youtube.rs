@@ -2,7 +2,8 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::fs;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
+use crate::selenium_youtube::{SeleniumExtractor, should_use_selenium};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoInfo {
@@ -49,7 +50,7 @@ fn get_yt_dlp_command() -> Vec<String> {
     // For hosting environments (Render.com, Koyeb, Railway, production), use direct yt-dlp
     if std::env::var("RENDER").is_ok() || 
        std::env::var("KOYEB").is_ok() ||
-       std::env::var("NODE_ENV").map_or(false, |v| v == "production") ||
+       std::env::var("NODE_ENV").is_ok_and(|v| v == "production") ||
        std::env::var("RAILWAY_ENVIRONMENT").is_ok() {
         return vec!["yt-dlp".to_string()];
     }
@@ -432,8 +433,38 @@ fn get_quality_height(quality: &str) -> String {
     }
 }
 
-// Get video info function
+// Enhanced get video info function with Selenium fallback
 pub async fn get_video_info(url: &str) -> Result<VideoInfo> {
+    // Try traditional yt-dlp first
+    match get_video_info_ytdlp(url).await {
+        Ok(info) => {
+            info!("Successfully extracted video info using yt-dlp");
+            Ok(info)
+        }
+        Err(e) => {
+            warn!("yt-dlp failed: {}, trying Selenium fallback", e);
+            
+            // Try Selenium fallback if enabled
+            if should_use_selenium() {
+                match get_video_info_selenium(url).await {
+                    Ok(info) => {
+                        info!("Successfully extracted video info using Selenium");
+                        Ok(info)
+                    }
+                    Err(selenium_err) => {
+                        error!("Both yt-dlp and Selenium failed. yt-dlp: {}, Selenium: {}", e, selenium_err);
+                        Err(anyhow!("All extraction methods failed. Last error: {}", selenium_err))
+                    }
+                }
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+// Original yt-dlp method
+async fn get_video_info_ytdlp(url: &str) -> Result<VideoInfo> {
     let yt_dlp_cmd = get_yt_dlp_command();
     let mut command = Command::new(&yt_dlp_cmd[0]);
     
@@ -467,6 +498,27 @@ pub async fn get_video_info(url: &str) -> Result<VideoInfo> {
         upload_date: json_value["upload_date"].as_str().map(|s| s.to_string()),
         view_count: json_value["view_count"].as_u64(),
         description: json_value["description"].as_str().map(|s| s.to_string()),
+    })
+}
+
+// Selenium-based fallback method
+async fn get_video_info_selenium(url: &str) -> Result<VideoInfo> {
+    let extractor = SeleniumExtractor::new()
+        .map_err(|e| anyhow!("Failed to create Selenium extractor: {}", e))?;
+    
+    let selenium_info = extractor.get_video_info(url).await
+        .map_err(|e| anyhow!("Selenium extraction failed: {}", e))?;
+    
+    // Convert SeleniumVideoInfo to VideoInfo
+    Ok(VideoInfo {
+        id: selenium_info.id,
+        title: selenium_info.title,
+        duration: selenium_info.duration,
+        thumbnail: selenium_info.thumbnail,
+        channel: selenium_info.channel,
+        upload_date: None, // Not extracted by Selenium version
+        view_count: selenium_info.view_count,
+        description: None, // Not extracted by Selenium version
     })
 }
 

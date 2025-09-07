@@ -3,6 +3,7 @@ mod websocket;
 mod state;
 mod security;
 mod youtube;
+mod selenium_youtube;
 
 use axum::{
     http::{header, Method},
@@ -28,6 +29,20 @@ async fn main() -> anyhow::Result<()> {
         .with_max_level(Level::INFO)
         .with_target(false)
         .init();
+
+    // Check dependencies including Selenium
+    info!("Checking system dependencies...");
+    if let Err(e) = youtube::check_dependencies().await {
+        tracing::warn!("YouTube dependency check failed: {}", e);
+    }
+    
+    // Check Selenium dependencies if enabled
+    if selenium_youtube::should_use_selenium() {
+        info!("Selenium mode enabled, checking Selenium dependencies...");
+        if let Err(e) = selenium_youtube::SeleniumExtractor::check_dependencies().await {
+            tracing::warn!("Selenium dependency check failed: {}", e);
+        }
+    }
 
     // Initialize application state
     let state = AppState::new().await?;
@@ -57,6 +72,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/download/{task_id}/{file_index}", get(handlers::download_playlist_file))
         .route("/api/health", get(handlers::health_check))
         .route("/api/dependencies", get(handlers::dependency_check))
+        .route("/api/clear-completed", post(handlers::clear_completed_tasks))
+        .route("/api/clear-all", post(handlers::clear_all_tasks))
         .route("/health", get(handlers::health_check))
         
         // WebSocket for real-time updates

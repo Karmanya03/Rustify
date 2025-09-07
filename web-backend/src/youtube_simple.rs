@@ -112,7 +112,7 @@ pub async fn check_dependencies() -> Result<()> {
     Ok(())
 }
 
-// Main download function with enhanced bot protection
+// Main download function - super simple and reliable
 pub async fn download_video(options: ConversionOptions) -> Result<String> {
     // Create output directory
     fs::create_dir_all(&options.output_dir).await?;
@@ -141,116 +141,27 @@ pub async fn download_video(options: ConversionOptions) -> Result<String> {
         command.arg(arg);
     }
     
-    // Enhanced bot protection arguments
+    // Add download arguments
     command
         .arg("--format").arg(&format_arg)
         .arg("--output").arg(&output_pattern)
         .arg("--no-playlist")
-        // Bot protection & cookies
-        .arg("--cookies-from-browser").arg("chrome")  // Try to use Chrome cookies first
-        .arg("--user-agent").arg("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        // Additional headers to appear more like a real browser
-        .arg("--add-header").arg("Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-        .arg("--add-header").arg("Accept-Language:en-US,en;q=0.5")
-        .arg("--add-header").arg("Accept-Encoding:gzip, deflate, br")
-        .arg("--add-header").arg("Sec-Fetch-Dest:document")
-        .arg("--add-header").arg("Sec-Fetch-Mode:navigate")
-        .arg("--add-header").arg("Sec-Fetch-Site:none")
-        .arg("--add-header").arg("Upgrade-Insecure-Requests:1")
-        // Retry and delay settings
-        .arg("--extractor-retries").arg("10")
-        .arg("--sleep-requests").arg("1")    // Wait 1 second between requests
-        .arg("--sleep-interval").arg("5")    // Wait 5 seconds on errors
-        .arg("--max-sleep-interval").arg("30") // Maximum wait time
-        // Bypass mechanisms
+        .arg("--user-agent").arg("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+        .arg("--extractor-retries").arg("5")
         .arg("--geo-bypass")
         .arg("--ignore-errors")
-        // Age verification bypass
-        .arg("--age-limit").arg("0")         // Bypass age restrictions
         .arg(&options.url);
 
-    info!("Executing yt-dlp with enhanced bot protection");
+    info!("Executing simplified yt-dlp command: {:?}", yt_dlp_cmd);
     let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
 
-    // If chrome cookies failed, try alternative approaches
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
-        
-        // Check if it's a bot detection error
-        if error_msg.contains("Sign in to confirm you're not a bot") || error_msg.contains("cookies") {
-            warn!("Chrome cookies failed, trying alternative approaches...");
-            return try_alternative_download(&yt_dlp_cmd, &options, &output_pattern, &format_arg).await;
-        }
-        
         let stdout_msg = String::from_utf8_lossy(&output.stdout);
         return Err(anyhow!("Download failed.\nStderr: {}\nStdout: {}", error_msg, stdout_msg));
     }
 
     find_downloaded_file(&output_dir).await
-}
-
-// Alternative download strategies if primary method fails
-async fn try_alternative_download(
-    yt_dlp_cmd: &[String], 
-    options: &ConversionOptions, 
-    output_pattern: &str, 
-    format_arg: &str
-) -> Result<String> {
-    let strategies = [
-        // Strategy 1: Try Firefox cookies
-        vec!["--cookies-from-browser", "firefox"],
-        // Strategy 2: Try Edge cookies
-        vec!["--cookies-from-browser", "edge"],
-        // Strategy 3: Use alternative extractor options
-        vec!["--extractor-args", "youtube:player_client=android"],
-        // Strategy 4: Use mobile user agent
-        vec!["--user-agent", "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"],
-        // Strategy 5: Try with different client
-        vec!["--extractor-args", "youtube:player_client=web"],
-    ];
-
-    for (i, strategy) in strategies.iter().enumerate() {
-        info!("Trying alternative strategy {}: {:?}", i + 1, strategy);
-        
-        let mut command = Command::new(&yt_dlp_cmd[0]);
-        
-        // Add base yt-dlp arguments
-        for arg in &yt_dlp_cmd[1..] {
-            command.arg(arg);
-        }
-        
-        // Basic arguments
-        command
-            .arg("--format").arg(format_arg)
-            .arg("--output").arg(output_pattern)
-            .arg("--no-playlist")
-            .arg("--extractor-retries").arg("5")
-            .arg("--sleep-requests").arg("2")
-            .arg("--geo-bypass")
-            .arg("--ignore-errors");
-            
-        // Add strategy-specific arguments
-        for arg in strategy {
-            command.arg(arg);
-        }
-        
-        command.arg(&options.url);
-
-        let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
-
-        if output.status.success() {
-            info!("Alternative strategy {} succeeded!", i + 1);
-            let output_dir = std::path::Path::new(&options.output_dir)
-                .canonicalize()
-                .map_err(|e| anyhow!("Failed to resolve output directory: {}", e))?;
-            return find_downloaded_file(&output_dir).await;
-        } else {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            warn!("Strategy {} failed: {}", i + 1, error_msg);
-        }
-    }
-
-    Err(anyhow!("All bot protection strategies failed. YouTube may be blocking automated access."))
 }
 
 async fn find_downloaded_file(output_dir: &std::path::Path) -> Result<String> {
@@ -368,61 +279,4 @@ pub async fn get_formats(url: &str) -> Result<Vec<FormatInfo>> {
     }
     
     Ok(formats)
-}
-
-// Get playlist info function
-pub async fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
-    let yt_dlp_cmd = get_yt_dlp_command();
-    let mut command = Command::new(&yt_dlp_cmd[0]);
-    
-    // Add base yt-dlp arguments if it's a python module call
-    for arg in &yt_dlp_cmd[1..] {
-        command.arg(arg);
-    }
-    
-    command
-        .arg("--dump-json")
-        .arg("--flat-playlist")
-        .arg(url);
-
-    let output = command.output().await.map_err(|e| anyhow!("Failed to execute yt-dlp: {}", e))?;
-
-    if !output.status.success() {
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow!("Failed to get playlist info: {}", error_msg));
-    }
-
-    let json_lines = String::from_utf8_lossy(&output.stdout);
-    let mut videos = Vec::new();
-    
-    for line in json_lines.lines() {
-        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
-            videos.push(VideoInfo {
-                id: json_value["id"].as_str().unwrap_or("").to_string(),
-                title: json_value["title"].as_str().unwrap_or("Unknown").to_string(),
-                duration: json_value["duration"].as_f64().map(|d| format!("{}s", d as u64)),
-                thumbnail: json_value["thumbnail"].as_str().map(|s| s.to_string()),
-                channel: json_value["uploader"].as_str().map(|s| s.to_string()),
-                upload_date: json_value["upload_date"].as_str().map(|s| s.to_string()),
-                view_count: json_value["view_count"].as_u64(),
-                description: json_value["description"].as_str().map(|s| s.to_string()),
-            });
-        }
-    }
-
-    Ok(PlaylistInfo {
-        id: "playlist".to_string(),
-        title: "Playlist".to_string(),
-        uploader: None,
-        video_count: videos.len(),
-        videos,
-    })
-}
-
-// Download playlist function
-pub async fn download_playlist(options: ConversionOptions) -> Result<Vec<String>> {
-    // For now, just download the first video as a simple implementation
-    // In a full implementation, you'd iterate through all playlist videos
-    let file_path = download_video(options).await?;
-    Ok(vec![file_path])
 }

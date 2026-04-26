@@ -59,85 +59,88 @@ Rustify supports:
 
 Important: Rustify does not download media directly from Spotify.
 
-## Install
+## Setup Guide
 
-### Prerequisites
+Follow these steps in order to get Rustify running on your machine.
 
-Install these first:
-- Rust toolchain
-- `yt-dlp`
-- `ffmpeg`
+### 1. Install Dependencies
 
-Windows setup:
+Rustify requires `ffmpeg` and `yt-dlp` to be installed on your system.
 
+**Windows:**
 ```powershell
-python -m pip install yt-dlp
+# Install via winget (recommended)
 winget install Gyan.FFmpeg
-```
+python -m pip install yt-dlp
 
-Verify:
-
-```powershell
-yt-dlp --version
+# Verify installation
 ffmpeg -version
+yt-dlp --version
 ```
 
-Linux / macOS setup:
-
+**Linux / macOS:**
 ```bash
+# Install via your package manager (e.g., brew or apt)
+brew install ffmpeg
 python3 -m pip install yt-dlp
-# install ffmpeg via your package manager
-yt-dlp --version
+
+# Verify
 ffmpeg -version
+yt-dlp --version
 ```
 
-Clone and check workspace:
+### 2. Download and Install
 
 ```powershell
+# Clone the repository
 git clone https://github.com/Karmanya03/Rustify.git
 cd Rustify
-cargo check --workspace
-```
 
-Install CLI command:
-
-```powershell
+# Install the CLI command globally (optional)
 cargo install --path cli --locked
 ```
 
-## Quick Start
+### 3. Quick Configuration
 
+Run the auto-setup script for your OS to automatically detect your browser and set up the default download folder.
+
+**Windows:**
 ```powershell
-# dependency and auth diagnostics
-cargo run -p rustify-cli -- doctor
-
-# convert one YouTube video to FLAC
-cargo run -p rustify-cli -- convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format flac --quality lossless
-
-# inspect a Spotify playlist
-cargo run -p rustify-cli -- info "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
-
-# launch desktop GUI
-cargo run -p rustify-desktop
-
-# launch local web backend
-cargo run -p web-backend
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
 ```
 
-Then open: http://127.0.0.1:3001
-
-## Commands
-
-General form:
-
-```powershell
-rustify <command> [options]
+**Linux / macOS:**
+```bash
+chmod +x scripts/setup-linux.sh
+./scripts/setup-linux.sh
 ```
 
-Or from source:
+**Headless (Server):**
+```bash
+./scripts/setup-linux.sh --headless
+```
+
+### 4. Running Rustify
+
+You can run Rustify in three ways:
+
+*   **CLI:** Use the `rustify` command (if installed) or `cargo run -p rustify-cli`.
+*   **Desktop App:** `cargo run -p rustify-desktop`
+*   **Web Interface:** `cargo run -p web-backend` (then open `http://127.0.0.1:3001`)
+
+---
+
+## Quick Start Examples
 
 ```powershell
-cargo run -p rustify-cli -- <command> [options]
+# Run a dependency check
+rustify doctor
+
+# Convert a single YouTube video to MP3 (320kbps)
+rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format mp3 --quality 320
+
+# Convert a Spotify playlist to FLAC
+rustify playlist "https://open.spotify.com/playlist/..." --format flac --quality lossless
 ```
 
 Available commands:
@@ -238,76 +241,28 @@ rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --star
 rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 501 --limit 250
 ```
 
-## Configuration
+### Manual Configuration
 
-Windows config path:
-
-```text
-%APPDATA%\rustify\config.json
-```
-
-### Auto Setup Scripts (OS + device aware)
-
-These scripts auto-create the Rustify config file, choose a sensible download path, detect available browser/tool binaries, and apply settings in one run.
-
-Windows (PowerShell, desktop/laptop):
+If you want to customize settings manually, use the `rustify config` command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
-```
-
-Linux/macOS (bash, desktop with GUI):
-
-```bash
-chmod +x scripts/setup-linux.sh
-./scripts/setup-linux.sh
-```
-
-Linux server/headless device (no GUI/browser session reuse):
-
-```bash
-chmod +x scripts/setup-linux.sh
-./scripts/setup-linux.sh --headless
-```
-
-Run from source instead of installed CLI:
-
-```powershell
-cargo run -p rustify-cli -- config show
-```
-
-Examples:
-
-```powershell
+# Show current config
 rustify config show
-rustify config reset
 
+# Set a custom download directory
 rustify config set download_dir "D:\Media\Rustify"
 
-rustify config set auth.mode auto
+# Set authentication mode
 rustify config set auth.mode browser
-rustify config set auth.mode cookie-file
-rustify config set auth.mode none
-
-rustify config set auth.browser edge
 rustify config set auth.browser chrome
-rustify config set auth.browser firefox
 
-rustify config set auth.cookie_file "D:\Secrets\youtube-cookies.txt"
-
-rustify config set rate_limits.request_delay_ms 1200
-rustify config set rate_limits.max_retries 6
-rustify config set rate_limits.backoff_base_ms 2000
-
+# Set Spotify integration (resolves tracks via YouTube)
 rustify config set spotify.enabled true
-rustify config set spotify.market from_token
-rustify config set spotify.fallback_to_page_scrape true
-rustify config set spotify.search_suffix "official audio"
-rustify config set spotify.page_size 100
-
-rustify config set binaries.yt_dlp "C:\Tools\yt-dlp.exe"
-rustify config set binaries.ffmpeg "C:\Tools\ffmpeg.exe"
 ```
+
+**Config File Location:**
+- **Windows:** `%APPDATA%\rustify\config.json`
+- **Linux/macOS:** `~/.config/rustify/config.json`
 
 Environment variable overrides:
 - `YTDLP_PATH`
@@ -325,15 +280,15 @@ Workspace crates:
 
 Feature matrix:
 
-| Capability | CLI | Desktop | Local Web |
-| --- | --- | --- | --- |
-| Single YouTube conversion | Yes | Yes | Yes |
-| YouTube playlist conversion | Yes | Yes | Yes |
-| Spotify playlist import | Yes | Yes | Yes |
-| MP3 / FLAC / WAV / AAC / OGG | Yes | Yes | Yes |
-| MP4 / WebM video output | Yes | Yes | Yes |
-| Browser-session auth reuse | Yes | Yes | Opt-in |
-| Dependency diagnostics | Yes | Indirect | API endpoint |
+| Capability                   | CLI | Desktop  | Local Web    |
+| ---------------------------- | --- | -------- | ------------ |
+| Single YouTube conversion    | Yes | Yes      | Yes          |
+| YouTube playlist conversion  | Yes | Yes      | Yes          |
+| Spotify playlist import      | Yes | Yes      | Yes          |
+| MP3 / FLAC / WAV / AAC / OGG | Yes | Yes      | Yes          |
+| MP4 / WebM video output      | Yes | Yes      | Yes          |
+| Browser-session auth reuse   | Yes | Yes      | Opt-in       |
+| Dependency diagnostics       | Yes | Indirect | API endpoint |
 
 ## FAQ
 

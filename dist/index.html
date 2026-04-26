@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rustify - Local Media Converter</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" href="32x32.png" sizes="32x32">
+    <link rel="apple-touch-icon" href="Rustify-logo.png">
     <style>
         * {
             margin: 0;
@@ -1144,6 +1147,201 @@
             font-size: 12px;
             font-weight: 300;
             position: relative;
+        
+        .task-info h4 {
+            margin-bottom: 0.25rem;
+            color: #f3f4f6;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .task-info p {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .task-status {
+            padding: 6px 16px;
+            border-radius: 25px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            backdrop-filter: blur(10px) saturate(120%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .task-status:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(255, 255, 255, 0.1);
+        }
+        
+        .task-status.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        
+        .task-status.processing {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        .task-status.failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 1.5rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                justify-content: center;
+            }
+            
+            .quality-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Animated Quality Cards */
+        .e-card {
+            background: transparent;
+            box-shadow: 0px 8px 28px -9px rgba(0,0,0,0.45);
+            position: relative;
+            width: 200px;
+            height: 180px;
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.9s ease;
+            backdrop-filter: blur(10px) saturate(120%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Selected Quality Card with Static Color Change */
+        .e-card.playing {
+            background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+            border: 2px solid rgba(16, 185, 129, 0.6);
+            box-shadow: 
+                0px 12px 35px -5px rgba(16, 185, 129, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(15px) saturate(150%);
+        }
+
+        .e-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0px 12px 35px -5px rgba(0,0,0,0.6);
+        }
+
+        .e-card.playing:hover {
+            transform: translateY(-8px);
+            box-shadow: 
+                0px 15px 40px -5px rgba(16, 185, 129, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .wave {
+            position: absolute;
+            width: 450px;
+            height: 600px;
+            opacity: 0.6;
+            left: 0;
+            top: 0;
+            margin-left: -50%;
+            margin-top: -70%;
+            background: linear-gradient(744deg,#af40ff,#5b42f3 60%,#00ddeb);
+            border-radius: 40%;
+            animation: wave 9000ms infinite linear;
+        }
+
+        .wave:nth-child(2),
+        .wave:nth-child(3) {
+            top: 100px;
+        }
+
+        .wave:nth-child(2) {
+            animation-duration: 12000ms;
+        }
+
+        .wave:nth-child(3) {
+            animation-duration: 15000ms;
+        }
+
+        .playing .wave {
+            animation: wave 9000ms infinite linear;
+        }
+
+        .playing .wave:nth-child(2) {
+            animation-duration: 12000ms;
+        }
+
+        .playing .wave:nth-child(3) {
+            animation-duration: 15000ms;
+        }
+
+        @keyframes wave {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .quality-icon {
+            width: 3em;
+            margin-top: -0.5em;
+            padding-bottom: 0.5em;
+            color: white;
+        }
+
+        .infotop {
+            text-align: center;
+            font-size: 16px;
+            position: absolute;
+            top: 2.5em;
+            left: 0;
+            right: 0;
+            color: rgb(255, 255, 255);
+            font-weight: 600;
+            z-index: 10;
+            padding: 0 1em;
+        }
+
+        .quality-name {
+            font-size: 15px;
+            font-weight: 400;
+            position: relative;
+            top: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .quality-description {
+            font-size: 12px;
+            font-weight: 300;
+            position: relative;
             top: 1.2em;
             opacity: 0.9;
             line-height: 1.4;
@@ -1156,8 +1354,9 @@
             margin: 1.5rem 0;
         }
     </style>
+
 </head>
-<<body>
+<body>
     <!-- Video Background -->
     <div class="video-background">
         <video autoplay muted loop playsinline>
@@ -1167,6 +1366,7 @@
     
     <div class="container">
         <div class="header">
+            <img src="Rustify-logo.png" alt="Rustify Logo" style="width: 120px; height: 120px; margin-bottom: 1.5rem; border-radius: 20%; box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); object-fit: cover;">
             <h1>Rustify</h1>
             <p>Modern Rust media converter for YouTube plus Spotify playlist imports.</p>
         </div>

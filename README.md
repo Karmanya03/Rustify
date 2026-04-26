@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="assets/Rustify-logo.png" alt="Rustify logo" width="320" />
 </p>
 
@@ -244,6 +244,36 @@ Windows config path:
 
 ```text
 %APPDATA%\rustify\config.json
+```
+
+### Auto Setup Scripts (OS + device aware)
+
+These scripts auto-create the Rustify config file, choose a sensible download path, detect available browser/tool binaries, and apply settings in one run.
+
+Windows (PowerShell, desktop/laptop):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+```
+
+Linux/macOS (bash, desktop with GUI):
+
+```bash
+chmod +x scripts/setup-linux.sh
+./scripts/setup-linux.sh
+```
+
+Linux server/headless device (no GUI/browser session reuse):
+
+```bash
+chmod +x scripts/setup-linux.sh
+./scripts/setup-linux.sh --headless
+```
+
+Run from source instead of installed CLI:
+
+```powershell
+cargo run -p rustify-cli -- config show
 ```
 
 Examples:

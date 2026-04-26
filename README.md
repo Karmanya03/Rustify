@@ -1,173 +1,132 @@
-# Rustify
+﻿<p align="center">
+  <img src="assets/Rustify-logo.png" alt="Rustify logo" width="320" />
+</p>
 
-> Local-first Rust media converter with a shared core for CLI, desktop GUI, and local web usage.
+<h1 align="center">Rustify</h1>
 
-Rustify keeps the website intact and adds native Rust app surfaces around the same engine:
+<p align="center"><strong>Local-First Rust Media Conversion Framework.</strong><br/>One shared core for CLI, Desktop GUI, and local Web usage.</p>
 
-- `rustify-cli` for automation and power use
-- `rustify-desktop` for a local GUI
-- `web-backend` for the existing website, served locally
+<p align="center">
+  <img alt="release" src="https://img.shields.io/badge/release-v1.0.1-red" />
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-red" />
+  <img alt="written in" src="https://img.shields.io/badge/written%20in-Rust-orange" />
+  <img alt="workspace" src="https://img.shields.io/badge/workspace-cli%20%7C%20core%20%7C%20desktop%20%7C%20web--backend-blue" />
+</p>
 
-It supports YouTube video conversion, YouTube playlist conversion, and Spotify playlist import that resolves each track into a YouTube-backed conversion job.
+<p align="center">
+  <img alt="single video" src="https://img.shields.io/badge/single%20video-YouTube-success" />
+  <img alt="playlist" src="https://img.shields.io/badge/playlist-YouTube%20%2B%20Spotify-success" />
+  <img alt="formats" src="https://img.shields.io/badge/formats-mp3%20flac%20wav%20aac%20ogg%20mp4%20webm-success" />
+  <img alt="dependencies" src="https://img.shields.io/badge/engine-yt--dlp%20%2B%20ffmpeg-blue" />
+</p>
 
-## Table of Contents
+<p align="center">
+  <img alt="auth" src="https://img.shields.io/badge/auth-public%20first%20%2B%20optional%20browser%20session-informational" />
+  <img alt="web default" src="https://img.shields.io/badge/web%20default-browser%20cookies%20disabled-important" />
+  <img alt="resume" src="https://img.shields.io/badge/playlist%20reruns-resume%20friendly-9cf" />
+</p>
 
-- [Overview](#overview)
-- [Feature Matrix](#feature-matrix)
-- [Project Layout](#project-layout)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage: CLI](#usage-cli)
-- [Usage: Desktop GUI](#usage-desktop-gui)
-- [Usage: Local Website](#usage-local-website)
-- [Spotify Playlist Imports](#spotify-playlist-imports)
-- [Large Playlists and Rate Limits](#large-playlists-and-rate-limits)
-- [YouTube Auth and Cookies](#youtube-auth-and-cookies)
-- [Audio Quality Notes](#audio-quality-notes)
-- [Configuration](#configuration)
-- [Development Commands](#development-commands)
-- [Troubleshooting](#troubleshooting)
-- [Security Notes](#security-notes)
+---
 
-## Overview
+<p align="center">
+  <a href="#what-is-this">What is this</a> |
+  <a href="#install">Install</a> |
+  <a href="#quick-start">Quick Start</a> |
+  <a href="#commands">Commands</a> |
+  <a href="#desktop-gui">Desktop GUI</a> |
+  <a href="#local-web-backend">Local Web</a> |
+  <a href="#spotify-playlists">Spotify</a> |
+  <a href="#configuration">Configuration</a> |
+  <a href="#architecture">Architecture</a> |
+  <a href="#faq">FAQ</a>
+</p>
 
-Rustify uses:
+---
 
+## What is this
+
+Rustify is a local-first media converter built in Rust.
+
+It uses:
 - `yt-dlp` for media extraction
-- `ffmpeg` for remuxing and transcoding
+- `ffmpeg` for remuxing/transcoding
 - one shared Rust core so CLI, desktop, and web stay aligned
 
-Spotify support is implemented as playlist import plus track matching. Rustify does not pull media directly from Spotify. It resolves the playlist metadata, then converts each item through a YouTube-backed search flow.
+Rustify supports:
+- single YouTube video conversion
+- YouTube playlist conversion
+- Spotify playlist import that resolves tracks into YouTube-backed conversion jobs
 
-## Feature Matrix
+Important: Rustify does not download media directly from Spotify.
 
-| Capability | CLI | Desktop GUI | Local Website |
-| --- | --- | --- | --- |
-| Single YouTube video conversion | Yes | Yes | Yes |
-| YouTube playlist conversion | Yes | Yes | Yes |
-| Spotify playlist import and conversion | Yes | Yes | Yes |
-| MP3 output | Yes | Yes | Yes |
-| FLAC output | Yes | Yes | Yes |
-| WAV output | Yes | Yes | Yes |
-| AAC / OGG output | Yes | Yes | Yes |
-| MP4 / WebM output | Yes | Yes | Yes |
-| Browser-session auth reuse | Yes | Yes | Opt-in |
-| Dependency diagnostics | Yes | Indirect | API endpoint |
-| Resume-friendly reruns for playlists | Yes | Yes | Yes |
+## Install
 
-## Project Layout
+### Prerequisites
 
-```text
-Rustify/
-|-- cli/           # Rust CLI application
-|-- core/          # Shared yt-dlp + ffmpeg engine
-|-- desktop/       # Tauri desktop app
-|-- dist/          # Existing website UI served by web-backend and desktop
-`-- web-backend/   # Axum backend for the local website
-```
-
-## Prerequisites
-
-Install these before running real downloads:
-
+Install these first:
 - Rust toolchain
-- `ffmpeg`
 - `yt-dlp`
+- `ffmpeg`
 
-### Windows
-
-Install `yt-dlp`:
+Windows setup:
 
 ```powershell
 python -m pip install yt-dlp
-```
-
-Check it:
-
-```powershell
-yt-dlp --version
-python -m yt_dlp --version
-```
-
-Install `ffmpeg`:
-
-```powershell
 winget install Gyan.FFmpeg
 ```
 
-Check it:
+Verify:
 
 ```powershell
-ffmpeg -version
-```
-
-### Linux / macOS
-
-Install `yt-dlp`:
-
-```bash
-python3 -m pip install yt-dlp
-```
-
-Install `ffmpeg` with your package manager, then verify:
-
-```bash
 yt-dlp --version
 ffmpeg -version
 ```
 
-## Installation
+Linux / macOS setup:
+
+```bash
+python3 -m pip install yt-dlp
+# install ffmpeg via your package manager
+yt-dlp --version
+ffmpeg -version
+```
+
+Clone and check workspace:
 
 ```powershell
-git clone <your-repo-url>
+git clone https://github.com/Karmanya03/Rustify.git
 cd Rustify
 cargo check --workspace
 ```
 
-Install the CLI locally:
+Install CLI command:
 
 ```powershell
 cargo install --path cli --locked
 ```
 
-That installs the `rustify` command.
-
 ## Quick Start
 
-### 1. Verify dependencies
-
 ```powershell
+# dependency and auth diagnostics
 cargo run -p rustify-cli -- doctor
-```
 
-### 2. Convert one YouTube video to FLAC
-
-```powershell
+# convert one YouTube video to FLAC
 cargo run -p rustify-cli -- convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format flac --quality lossless
-```
 
-### 3. Inspect a Spotify playlist
-
-```powershell
+# inspect a Spotify playlist
 cargo run -p rustify-cli -- info "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
-```
 
-### 4. Launch the desktop GUI
-
-```powershell
+# launch desktop GUI
 cargo run -p rustify-desktop
-```
 
-### 5. Launch the website locally
-
-```powershell
+# launch local web backend
 cargo run -p web-backend
 ```
 
-Then open [http://127.0.0.1:3001](http://127.0.0.1:3001).
+Then open: http://127.0.0.1:3001
 
-## Usage: CLI
+## Commands
 
 General form:
 
@@ -181,407 +140,35 @@ Or from source:
 cargo run -p rustify-cli -- <command> [options]
 ```
 
-### Convert a single video
+Available commands:
+- `convert` - convert one video
+- `playlist` - convert YouTube or Spotify playlists
+- `batch` - convert playlist to multiple formats
+- `info` - inspect metadata
+- `quality` - list available source qualities
+- `config` - show/set/reset configuration
+- `doctor` - dependency and auth diagnostics
 
-MP3:
+Examples:
 
 ```powershell
+# single video to MP3
 rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format mp3 --quality 320
-```
 
-FLAC:
-
-```powershell
-rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format flac --quality lossless
-```
-
-WAV:
-
-```powershell
-rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format wav --quality hd
-```
-
-MP4:
-
-```powershell
-rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format mp4 --quality 1080p
-```
-
-Custom output directory:
-
-```powershell
-rustify --output "D:\Media\Rustify" convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format flac --quality lossless
-```
-
-Custom output filename:
-
-```powershell
-rustify convert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format mp3 --quality 320 --name "my-track"
-```
-
-### Convert a playlist
-
-YouTube playlist:
-
-```powershell
-rustify playlist "https://www.youtube.com/playlist?list=YOUR_LIST_ID" --format mp3 --quality 320
-```
-
-Spotify playlist:
-
-```powershell
+# Spotify playlist to FLAC
 rustify playlist "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M" --format flac --quality lossless
-```
 
-Run a slice of a large playlist:
-
-```powershell
-rustify playlist "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M" --format mp3 --quality 320 --start 201 --limit 100
-```
-
-### Batch convert a playlist into multiple formats
-
-```powershell
+# batch playlist into multiple formats
 rustify batch "https://www.youtube.com/playlist?list=YOUR_LIST_ID" --formats "mp3,flac,mp4" --qualities "mp3:320,flac:lossless,mp4:1080p"
-```
 
-Spotify batch:
-
-```powershell
-rustify batch "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M" --formats "mp3,flac" --qualities "mp3:320,flac:lossless"
-```
-
-### Inspect metadata
-
-```powershell
-rustify info "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+# inspect metadata as JSON
 rustify info "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --format json
-rustify info "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
-```
 
-### Inspect available source qualities
-
-```powershell
+# quality inspection
 rustify quality "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-rustify quality "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --audio-only
-rustify quality "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --video-only
 ```
 
-### Dependency and auth diagnostics
-
-```powershell
-rustify doctor
-```
-
-## Usage: Desktop GUI
-
-Run it:
-
-```powershell
-cargo run -p rustify-desktop
-```
-
-Or from the desktop folder:
-
-```powershell
-cd desktop
-cargo tauri dev
-```
-
-Desktop flow:
-
-1. Paste a YouTube video URL or a YouTube / Spotify playlist URL.
-2. Choose format and quality.
-3. Pick an output folder if needed.
-4. Start conversion.
-5. Track progress locally in-app.
-
-Recommended desktop use:
-
-- videos that need local browser-session reuse
-- users who want local auth without CLI setup
-- large playlist jobs run locally on the same machine
-
-## Usage: Local Website
-
-Run the backend:
-
-```powershell
-cargo run -p web-backend
-```
-
-Open [http://127.0.0.1:3001](http://127.0.0.1:3001).
-
-The backend serves the existing website from `dist/`, so normal usage should go through the local server rather than opening `dist/index.html` directly.
-
-Website flow:
-
-1. Start the backend.
-2. Open the local URL.
-3. Paste a YouTube video URL or a YouTube / Spotify playlist URL.
-4. Choose format and quality.
-5. Start conversion and monitor progress.
-
-### Safer default for web mode
-
-By default, the web backend:
-
-- does not auto-read browser cookies
-- runs in public-only auth mode
-
-To opt in locally:
-
-```powershell
-$env:RUSTIFY_WEB_ALLOW_BROWSER_COOKIES="true"
-cargo run -p web-backend
-```
-
-## Spotify Playlist Imports
-
-Supported inputs:
-
-- `https://open.spotify.com/playlist/...`
-- `spotify:playlist:...`
-
-How it works:
-
-1. Rustify resolves playlist metadata locally in pages.
-2. Each track is turned into a YouTube search-backed conversion job.
-3. Output files use stable zero-padded playlist indexes so reruns stay aligned.
-
-Important scope note:
-
-- Rustify does not download audio directly from Spotify.
-- Spotify support is playlist import plus track matching.
-- Final media extraction still happens through YouTube and `yt-dlp`.
-
-This keeps Spotify support user-friendly without asking users for Spotify secrets.
-
-## Large Playlists and Rate Limits
-
-For very large playlists, Rustify is designed to behave like a resumable local batch job.
-
-What it does:
-
-- resolves Spotify playlists in pages of up to `100` tracks
-- retries `429` and `5xx` responses with backoff
-- respects `Retry-After` when the upstream service sends it
-- inserts configurable pacing between requests and conversion jobs
-- writes deterministic indexed output filenames
-- skips existing non-empty files on rerun
-
-That means thousands of tracks are handled as a long queue, not as a single fragile request burst.
-
-Recommended chunking for huge libraries:
-
-```powershell
-rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 1 --limit 250
-rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 251 --limit 250
-rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 501 --limit 250
-```
-
-Helpful pacing config:
-
-```powershell
-rustify config set rate_limits.request_delay_ms 1500
-rustify config set rate_limits.max_retries 6
-rustify config set rate_limits.backoff_base_ms 2000
-```
-
-To resume, rerun the same playlist command against the same output folder. Finished files are skipped automatically.
-
-## YouTube Auth and Cookies
-
-Recommended behavior:
-
-### CLI and desktop
-
-Use `Auto` mode:
-
-1. Try public access first.
-2. If YouTube demands auth or anti-bot verification, reuse the user’s own local browser session.
-3. Never hardcode cookies.
-4. Keep exported cookie files as an advanced fallback only.
-
-### Web backend
-
-Use the safer default:
-
-1. Public-only mode by default.
-2. Browser-cookie reuse only when explicitly enabled locally.
-3. Never auto-read cookies on a hosted server.
-
-### Why this is the right implementation
-
-Hardcoded cookies are a bad idea because they:
-
-- leak secrets
-- risk the account itself
-- get copied into logs, backups, screenshots, and Git history
-
-Manual cookie-file export should stay a fallback, not the main UX.
-
-Best practical UX:
-
-- `Auto` mode for CLI and desktop
-- browser-session reuse only when needed
-- no cookie copying by default
-- optional cookie-file override for advanced or headless setups
-
-## Audio Quality Notes
-
-### MP3
-
-- recommended high-quality target: `320 kbps`
-
-### FLAC
-
-Rustify writes FLAC with `ffmpeg` compression level `0`.
-
-That means:
-
-- no additional lossy compression is added by Rustify
-- the decoded source is preserved in FLAC form
-- bitrate can exceed `900 kbps` depending on the source material
-
-Important reality:
-
-- YouTube source audio is usually already lossy
-- FLAC preserves that source cleanly but cannot create new lossless fidelity from a lossy stream
-
-### WAV
-
-Use WAV when you want:
-
-- fully uncompressed PCM output
-- larger files
-- maximum compatibility with editors and DAWs
-
-## Configuration
-
-Windows CLI config path:
-
-```text
-%APPDATA%\rustify\config.json
-```
-
-### Show current config
-
-```powershell
-rustify config show
-```
-
-### Reset config
-
-```powershell
-rustify config reset
-```
-
-### Set default download directory
-
-```powershell
-rustify config set download_dir "D:\Media\Rustify"
-```
-
-### Set auth mode
-
-```powershell
-rustify config set auth.mode auto
-rustify config set auth.mode browser
-rustify config set auth.mode cookie-file
-rustify config set auth.mode none
-```
-
-### Set preferred browser for cookie reuse
-
-```powershell
-rustify config set auth.browser edge
-rustify config set auth.browser chrome
-rustify config set auth.browser firefox
-```
-
-### Set a manual cookie file
-
-```powershell
-rustify config set auth.cookie_file "D:\Secrets\youtube-cookies.txt"
-```
-
-### Tune rate-limit handling
-
-```powershell
-rustify config set rate_limits.request_delay_ms 1200
-rustify config set rate_limits.max_retries 6
-rustify config set rate_limits.backoff_base_ms 2000
-```
-
-### Tune Spotify playlist import behavior
-
-```powershell
-rustify config set spotify.enabled true
-rustify config set spotify.market from_token
-rustify config set spotify.fallback_to_page_scrape true
-rustify config set spotify.search_suffix "official audio"
-rustify config set spotify.page_size 100
-```
-
-### Override binary paths
-
-```powershell
-rustify config set binaries.yt_dlp "C:\Tools\yt-dlp.exe"
-rustify config set binaries.ffmpeg "C:\Tools\ffmpeg.exe"
-```
-
-### Helpful environment variables
-
-`YTDLP_PATH`
-
-```powershell
-$env:YTDLP_PATH="C:\Tools\yt-dlp.exe"
-```
-
-`FFMPEG_PATH`
-
-```powershell
-$env:FFMPEG_PATH="C:\Tools\ffmpeg.exe"
-```
-
-`DOWNLOADS_DIR`
-
-```powershell
-$env:DOWNLOADS_DIR="D:\Media\Rustify"
-```
-
-`RUSTIFY_WEB_ALLOW_BROWSER_COOKIES`
-
-```powershell
-$env:RUSTIFY_WEB_ALLOW_BROWSER_COOKIES="true"
-```
-
-## Development Commands
-
-Check everything:
-
-```powershell
-cargo check --workspace
-```
-
-Offline check:
-
-```powershell
-cargo check --workspace --offline
-```
-
-Run tests:
-
-```powershell
-cargo test -p rustify-core --offline
-```
-
-Run CLI:
-
-```powershell
-cargo run -p rustify-cli -- doctor
-```
+## Desktop GUI
 
 Run desktop app:
 
@@ -589,73 +176,166 @@ Run desktop app:
 cargo run -p rustify-desktop
 ```
 
-Run web backend:
+Or:
+
+```powershell
+cd desktop
+cargo tauri dev
+```
+
+Flow:
+1. Paste a YouTube video URL or YouTube/Spotify playlist URL
+2. Choose format and quality
+3. Pick output folder
+4. Start conversion and track progress
+
+## Local Web Backend
+
+Run backend:
 
 ```powershell
 cargo run -p web-backend
 ```
 
-## Troubleshooting
+Open: http://127.0.0.1:3001
 
-### `yt-dlp` is missing
+The backend serves the site from `dist/`.
+Use the server, not direct file-open of `dist/index.html`.
 
-```powershell
-python -m pip install yt-dlp
-rustify doctor
-```
+Safer web default:
+- browser cookie auto-read is disabled
+- backend runs in public-first mode
 
-### `ffmpeg` is missing
-
-Install `ffmpeg`, then verify:
-
-```powershell
-ffmpeg -version
-rustify doctor
-```
-
-### Browser-session reuse is not working
-
-1. Make sure the browser is logged into YouTube.
-2. Close and reopen the browser.
-3. Set a preferred browser explicitly:
-
-```powershell
-rustify config set auth.browser edge
-```
-
-4. Run:
-
-```powershell
-rustify doctor
-```
-
-### Website downloads work publicly but fail for restricted videos
-
-That is expected with the safer web default. Use one of these:
-
-- run the desktop app
-- use the CLI
-- opt in locally for the backend
+Optional local override:
 
 ```powershell
 $env:RUSTIFY_WEB_ALLOW_BROWSER_COOKIES="true"
 cargo run -p web-backend
 ```
 
-### Very large playlist runs are slow
+## Spotify Playlists
 
-That is normal for a local-first converter, especially when a Spotify playlist must be matched track by track to YouTube sources.
+Supported inputs:
+- `https://open.spotify.com/playlist/...`
+- `spotify:playlist:...`
 
-Use one or more of these:
+How it works:
+1. Rustify resolves playlist metadata
+2. each track becomes a YouTube-backed conversion job
+3. output files are zero-padded and deterministic for reruns
 
-1. Split the job with `--start` and `--limit`.
-2. Increase `rate_limits.request_delay_ms` if you are seeing `429` responses.
-3. Rerun into the same output folder to resume from completed files.
+Large playlist behavior:
+- paging support
+- retry/backoff on `429` and `5xx`
+- `Retry-After` support
+- resume-friendly reruns by skipping existing non-empty files
 
-## Security Notes
+Chunking example:
 
-- Do not hardcode YouTube cookies.
-- Do not commit cookie files.
-- Do not store personal browser-session exports in the repository.
-- `.gitignore` should keep cookie exports, local secrets, downloads, caches, and temp files out of Git.
-- Keep browser-cookie reuse disabled for hosted web deployments.
+```powershell
+rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 1 --limit 250
+rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 251 --limit 250
+rustify playlist "SPOTIFY_OR_YOUTUBE_PLAYLIST" --format mp3 --quality 320 --start 501 --limit 250
+```
+
+## Configuration
+
+Windows config path:
+
+```text
+%APPDATA%\rustify\config.json
+```
+
+Examples:
+
+```powershell
+rustify config show
+rustify config reset
+
+rustify config set download_dir "D:\Media\Rustify"
+
+rustify config set auth.mode auto
+rustify config set auth.mode browser
+rustify config set auth.mode cookie-file
+rustify config set auth.mode none
+
+rustify config set auth.browser edge
+rustify config set auth.browser chrome
+rustify config set auth.browser firefox
+
+rustify config set auth.cookie_file "D:\Secrets\youtube-cookies.txt"
+
+rustify config set rate_limits.request_delay_ms 1200
+rustify config set rate_limits.max_retries 6
+rustify config set rate_limits.backoff_base_ms 2000
+
+rustify config set spotify.enabled true
+rustify config set spotify.market from_token
+rustify config set spotify.fallback_to_page_scrape true
+rustify config set spotify.search_suffix "official audio"
+rustify config set spotify.page_size 100
+
+rustify config set binaries.yt_dlp "C:\Tools\yt-dlp.exe"
+rustify config set binaries.ffmpeg "C:\Tools\ffmpeg.exe"
+```
+
+Environment variable overrides:
+- `YTDLP_PATH`
+- `FFMPEG_PATH`
+- `DOWNLOADS_DIR`
+- `RUSTIFY_WEB_ALLOW_BROWSER_COOKIES`
+
+## Architecture
+
+Workspace crates:
+- `core/` - shared conversion engine
+- `cli/` - command line interface
+- `desktop/` - Tauri desktop app
+- `web-backend/` - Axum backend for local web UI
+
+Feature matrix:
+
+| Capability | CLI | Desktop | Local Web |
+| --- | --- | --- | --- |
+| Single YouTube conversion | Yes | Yes | Yes |
+| YouTube playlist conversion | Yes | Yes | Yes |
+| Spotify playlist import | Yes | Yes | Yes |
+| MP3 / FLAC / WAV / AAC / OGG | Yes | Yes | Yes |
+| MP4 / WebM video output | Yes | Yes | Yes |
+| Browser-session auth reuse | Yes | Yes | Opt-in |
+| Dependency diagnostics | Yes | Indirect | API endpoint |
+
+## FAQ
+
+### Is this for local use only?
+Yes. Rustify is designed for local-first workflows.
+
+### Does Rustify bypass restrictions with hardcoded cookies?
+No. Hardcoded cookies are intentionally not used.
+
+### Why do some videos fail in web mode but work in desktop/CLI?
+Web mode defaults to safer public-first behavior. Restricted videos can need local browser-session reuse.
+
+### Can Rustify create true lossless quality from lossy sources?
+No. FLAC preserves decoded source quality but cannot create fidelity beyond the source stream.
+
+### How do I run quality gates before release?
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+```
+
+## Development
+
+```powershell
+cargo check --workspace
+cargo test -p rustify-core --offline
+cargo run -p rustify-cli -- doctor
+cargo run -p rustify-desktop
+cargo run -p web-backend
+```
+
+## License
+
+MIT - see [LICENSE](LICENSE).

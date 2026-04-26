@@ -52,6 +52,19 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
+# Node modules
+node_modules/
+
+# Redundant build/dist folders
+/web-backend/dist/
+
+# Root level dev/temp scripts
+/create_ico_file.py
+/DEPLOYMENT_READY.md
+/test_playlist.ps1
+/package.json.bak
+/test-build.ps1
+
 # Temporary files and local backups
 .cache/
 cache/

@@ -1758,7 +1758,7 @@
                     setOutputDirectory(path);
                 }
             } catch (error) {
-                showStatus(`Could not select output folder: ${error}`, 'error');
+                showStatus(`Could not select output folder: ${getErrorMessage(error)}`, 'error');
             }
         }
 
@@ -1817,7 +1817,7 @@
             options.forEach((option, index) => {
                 const cardDiv = document.createElement('div');
                 cardDiv.className = `e-card ${index === 0 ? 'playing' : ''}`;
-                cardDiv.onclick = () => selectQuality(option.value, 'single');
+                cardDiv.onclick = (event) => selectQuality(event, option.value, 'single');
                 
                 const iconSvg = ['mp3', 'flac', 'wav', 'aac', 'ogg'].includes(format)
                     ? `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="quality-icon">
@@ -1854,7 +1854,7 @@
             options.forEach((option, index) => {
                 const cardDiv = document.createElement('div');
                 cardDiv.className = `e-card ${index === 0 ? 'playing' : ''}`;
-                cardDiv.onclick = () => selectQuality(option.value, 'playlist');
+                cardDiv.onclick = (event) => selectQuality(event, option.value, 'playlist');
                 
                 const iconSvg = ['mp3', 'flac', 'wav', 'aac', 'ogg'].includes(format)
                     ? `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="quality-icon">
@@ -1882,7 +1882,7 @@
             }
         }
         
-        function selectQuality(quality, type) {
+        function selectQuality(event, quality, type) {
             if (type === 'single') {
                 selectedQuality = quality;
                 document.querySelectorAll('#quality-options .e-card').forEach(card => {
@@ -1896,9 +1896,21 @@
             }
             
             // Find the clicked card and add playing class
-            const clickedCard = event.target.closest('.e-card');
+            const clickedCard = event && event.target ? event.target.closest('.e-card') : null;
             if (clickedCard) {
                 clickedCard.classList.add('playing');
+            }
+        }
+
+        function getErrorMessage(error) {
+            if (!error) return 'Unknown error';
+            if (typeof error === 'string') return error;
+            if (error.message) return error.message;
+            if (error.error) return error.error;
+            try {
+                return JSON.stringify(error);
+            } catch (_) {
+                return String(error);
             }
         }
         
@@ -2018,7 +2030,7 @@
                 
                 showStatus('Download started! Check your Downloads folder.', 'success');
             } catch (error) {
-                showStatus(`Download error: ${error.message}`, 'error');
+                showStatus(`Download error: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2153,7 +2165,7 @@
                 displayVideoInfo(info);
                 showStatus('Video information retrieved successfully!', 'success');
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showStatus(`Error: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2169,7 +2181,7 @@
                 const info = await apiCall('/info', 'POST', { url });
                 showStatus(`Playlist found: ${info.title || 'Unknown'} (${info.video_count || 'Unknown'} videos)`, 'success');
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showStatus(`Error: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2208,7 +2220,7 @@
                 
             } catch (error) {
                 hideProgress();
-                showStatus(`Error: ${error.message}`, 'error');
+                showStatus(`Error: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2257,7 +2269,7 @@
                 
             } catch (error) {
                 hideProgress();
-                showStatus(`Error: ${error.message}`, 'error');
+                showStatus(`Error: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2267,7 +2279,7 @@
                 currentTasks = Array.isArray(tasks) ? tasks : [];
                 displayTasks(tasks);
             } catch (error) {
-                showStatus(`Error loading tasks: ${error.message}`, 'error');
+                showStatus(`Error loading tasks: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2277,7 +2289,7 @@
                 showStatus('Task cancelled successfully', 'success');
                 refreshTasks();
             } catch (error) {
-                showStatus(`Error cancelling task: ${error.message}`, 'error');
+                showStatus(`Error cancelling task: ${getErrorMessage(error)}`, 'error');
             }
         }
         
@@ -2288,7 +2300,7 @@
                     refreshTasks();
                 })
                 .catch(error => {
-                    showStatus(`Error clearing tasks: ${error.message}`, 'error');
+                    showStatus(`Error clearing tasks: ${getErrorMessage(error)}`, 'error');
                 });
         }
         

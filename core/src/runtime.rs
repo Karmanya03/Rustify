@@ -116,6 +116,9 @@ pub async fn run_ytdlp_capture(config: &AppConfig, args: &[String]) -> Result<Ca
 
     for attempt in attempts {
         let mut command = spec.build_tokio();
+        if disable_external_ytdlp_plugins() {
+            command.arg("--no-plugin-dirs");
+        }
         command.args(&attempt.extra_args);
         command.args(args);
 
@@ -170,6 +173,9 @@ pub async fn run_ytdlp_with_progress(
             .arg("--newline")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if disable_external_ytdlp_plugins() {
+            command.arg("--no-plugin-dirs");
+        }
         command.args(&attempt.extra_args);
         command.args(args);
 
@@ -380,6 +386,17 @@ fn looks_like_auth_error(output: &str) -> bool {
     ];
 
     markers.iter().any(|marker| lowered.contains(marker))
+}
+
+fn disable_external_ytdlp_plugins() -> bool {
+    std::env::var("RUSTIFY_YTDLP_ALLOW_PLUGINS")
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+        .unwrap_or(true)
 }
 
 async fn capture_command_output(

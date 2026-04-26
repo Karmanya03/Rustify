@@ -204,8 +204,16 @@ pub fn default_browser_order() -> Vec<BrowserKind> {
     if cfg!(target_os = "windows") {
         vec![BrowserKind::Edge, BrowserKind::Chrome, BrowserKind::Firefox]
     } else if cfg!(target_os = "macos") {
-        vec![BrowserKind::Safari, BrowserKind::Chrome, BrowserKind::Firefox]
+        vec![
+            BrowserKind::Safari,
+            BrowserKind::Chrome,
+            BrowserKind::Firefox,
+        ]
     } else {
-        vec![BrowserKind::Firefox, BrowserKind::Chrome, BrowserKind::Chromium]
+        vec![
+            BrowserKind::Firefox,
+            BrowserKind::Chrome,
+            BrowserKind::Chromium,
+        ]
     }
 }

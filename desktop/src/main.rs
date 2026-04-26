@@ -9,7 +9,7 @@ use tauri::Manager;
 fn main() {
     // Setup logging
     tracing_subscriber::fmt::init();
-    
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_video_info,

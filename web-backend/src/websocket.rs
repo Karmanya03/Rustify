@@ -10,10 +10,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
-pub async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
+pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(|socket| websocket_connection(socket, state))
 }
 

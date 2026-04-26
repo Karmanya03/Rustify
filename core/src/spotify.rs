@@ -160,7 +160,11 @@ impl SpotifyResolver {
         .await
     }
 
-    async fn resolve_with_public_api(&self, playlist_id: &str, token: &str) -> Result<SpotifyPlaylist> {
+    async fn resolve_with_public_api(
+        &self,
+        playlist_id: &str,
+        token: &str,
+    ) -> Result<SpotifyPlaylist> {
         let meta_url = format!("https://api.spotify.com/v1/playlists/{playlist_id}");
         let metadata: Value = self
             .get_json(
@@ -304,15 +308,14 @@ impl SpotifyResolver {
 
     async fn pace_requests(&self) {
         if self.config.rate_limits.request_delay_ms > 0 {
-            sleep(Duration::from_millis(self.config.rate_limits.request_delay_ms)).await;
+            sleep(Duration::from_millis(
+                self.config.rate_limits.request_delay_ms,
+            ))
+            .await;
         }
     }
 
-    async fn get_text(
-        &self,
-        request: reqwest::RequestBuilder,
-        label: &str,
-    ) -> Result<String> {
+    async fn get_text(&self, request: reqwest::RequestBuilder, label: &str) -> Result<String> {
         let mut attempt = 0u32;
         loop {
             let response = request
@@ -329,7 +332,8 @@ impl SpotifyResolver {
                     .with_context(|| format!("Failed to read {label} response body"));
             }
 
-            if should_retry_status(response.status()) && attempt < self.config.rate_limits.max_retries
+            if should_retry_status(response.status())
+                && attempt < self.config.rate_limits.max_retries
             {
                 let delay = retry_delay(&self.config, attempt, response.headers());
                 attempt += 1;
@@ -367,7 +371,8 @@ impl SpotifyResolver {
                     .with_context(|| format!("Failed to decode {label} response"));
             }
 
-            if should_retry_status(response.status()) && attempt < self.config.rate_limits.max_retries
+            if should_retry_status(response.status())
+                && attempt < self.config.rate_limits.max_retries
             {
                 let delay = retry_delay(&self.config, attempt, response.headers());
                 attempt += 1;
@@ -466,7 +471,12 @@ fn retry_delay(config: &AppConfig, attempt: u32, headers: &HeaderMap) -> Duratio
     }
 
     let multiplier = 2u64.saturating_pow(attempt.min(8));
-    Duration::from_millis(config.rate_limits.backoff_base_ms.saturating_mul(multiplier))
+    Duration::from_millis(
+        config
+            .rate_limits
+            .backoff_base_ms
+            .saturating_mul(multiplier),
+    )
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use rustify_core::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{State, Window};
 use uuid::Uuid;
@@ -125,7 +125,9 @@ pub async fn convert_video(
         let mut tasks = state.tasks.lock().unwrap();
         tasks.insert(task_id.clone(), task.clone());
     }
-    window.emit("task_update", &task).map_err(|error| error.to_string())?;
+    window
+        .emit("task_update", &task)
+        .map_err(|error| error.to_string())?;
 
     let rustify = Arc::clone(&state.rustify);
     let tasks = Arc::clone(&state.tasks);
@@ -203,10 +205,11 @@ pub async fn convert_playlist(
         .await
         .map_err(|error| error.to_string())?;
     let output_format = parse_output_format(&format, &quality)?;
-    let output_root = output_dir
-        .as_deref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| state.default_output_dir.join(sanitize_filename(&playlist_info.title)));
+    let output_root = output_dir.as_deref().map(PathBuf::from).unwrap_or_else(|| {
+        state
+            .default_output_dir
+            .join(sanitize_filename(&playlist_info.title))
+    });
 
     let task = ConversionTask {
         id: batch_id.clone(),
@@ -225,7 +228,9 @@ pub async fn convert_playlist(
         let mut tasks = state.tasks.lock().unwrap();
         tasks.insert(batch_id.clone(), task.clone());
     }
-    window.emit("task_update", &task).map_err(|error| error.to_string())?;
+    window
+        .emit("task_update", &task)
+        .map_err(|error| error.to_string())?;
 
     let rustify = Arc::clone(&state.rustify);
     let tasks = Arc::clone(&state.tasks);
@@ -242,27 +247,21 @@ pub async fn convert_playlist(
         emit_task_update(&tasks, &window_handle, &batch_id_clone);
 
         let result = rustify
-            .convert_playlist(
-                &url_clone,
-                output_root,
-                output_format,
-                &quality_clone,
-                {
-                    let tasks = Arc::clone(&tasks);
-                    let task_id = batch_id_clone.clone();
-                    let window = window_handle.clone();
-                    move |index, progress| {
-                        let overall = (((index as f64) + (progress.percentage / 100.0)) / total_videos)
-                            * 100.0;
-                        update_task(&tasks, &task_id, |task| {
-                            task.progress = overall.clamp(0.0, 100.0) as f32;
-                            task.speed = progress.speed.clone();
-                            task.eta = progress.eta.clone();
-                        });
-                        emit_task_update(&tasks, &window, &task_id);
-                    }
-                },
-            )
+            .convert_playlist(&url_clone, output_root, output_format, &quality_clone, {
+                let tasks = Arc::clone(&tasks);
+                let task_id = batch_id_clone.clone();
+                let window = window_handle.clone();
+                move |index, progress| {
+                    let overall =
+                        (((index as f64) + (progress.percentage / 100.0)) / total_videos) * 100.0;
+                    update_task(&tasks, &task_id, |task| {
+                        task.progress = overall.clamp(0.0, 100.0) as f32;
+                        task.speed = progress.speed.clone();
+                        task.eta = progress.eta.clone();
+                    });
+                    emit_task_update(&tasks, &window, &task_id);
+                }
+            })
             .await;
 
         let (status, progress, speed, eta) = match result {
@@ -407,13 +406,13 @@ fn extension_for_format(format: &OutputFormat) -> &'static str {
 
 fn build_output_path(
     requested_dir: Option<&str>,
-    default_dir: &PathBuf,
+    default_dir: &Path,
     title: &str,
     format: &OutputFormat,
 ) -> PathBuf {
     let directory = requested_dir
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_dir.clone());
+        .unwrap_or_else(|| default_dir.to_path_buf());
     directory.join(format!(
         "{}.{}",
         sanitize_filename(title),

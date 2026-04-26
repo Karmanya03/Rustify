@@ -1,23 +1,23 @@
-use std::path::Path;
-use regex::Regex;
 use chrono::Utc;
+use regex::Regex;
+use std::path::Path;
 
 /// Sanitize filename for safe filesystem usage
 pub fn sanitize_filename(name: &str) -> String {
     // Remove or replace invalid filename characters
     let invalid_chars = Regex::new(r#"[<>:"/\\|?*]"#).unwrap();
     let sanitized = invalid_chars.replace_all(name, "_");
-    
+
     // Trim whitespace and dots
     let trimmed = sanitized.trim_matches(|c: char| c.is_whitespace() || c == '.');
-    
+
     // Limit length to 200 characters
     let limited = if trimmed.len() > 200 {
         &trimmed[..200]
     } else {
         trimmed
     };
-    
+
     // Ensure not empty
     if limited.is_empty() {
         "untitled".to_string()
@@ -31,7 +31,7 @@ pub fn format_duration(seconds: u64) -> String {
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
     let secs = seconds % 60;
-    
+
     if hours > 0 {
         format!("{:02}:{:02}:{:02}", hours, minutes, secs)
     } else {
@@ -42,7 +42,7 @@ pub fn format_duration(seconds: u64) -> String {
 /// Parse duration string (HH:MM:SS or MM:SS) to seconds
 pub fn parse_duration(duration_str: &str) -> Option<u64> {
     let parts: Vec<&str> = duration_str.split(':').collect();
-    
+
     match parts.len() {
         2 => {
             // MM:SS format
@@ -64,7 +64,7 @@ pub fn parse_duration(duration_str: &str) -> Option<u64> {
 /// Generate output filename with timestamp
 pub fn generate_output_filename(title: &str, extension: &str, add_timestamp: bool) -> String {
     let clean_title = sanitize_filename(title);
-    
+
     if add_timestamp {
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
         format!("{}_{}.{}", clean_title, timestamp, extension)
@@ -98,10 +98,10 @@ pub fn is_valid_youtube_url(url: &str) -> bool {
         r"^https?://(www\.)?youtube\.com/channel/[\w-]+",
         r"^https?://(www\.)?youtube\.com/@[\w-]+",
     ];
-    
-    youtube_patterns.iter().any(|pattern| {
-        Regex::new(pattern).unwrap().is_match(url)
-    })
+
+    youtube_patterns
+        .iter()
+        .any(|pattern| Regex::new(pattern).unwrap().is_match(url))
 }
 
 /// Validate playlist URLs supported by Rustify.
@@ -115,12 +115,12 @@ pub fn extract_video_id(url: &str) -> Option<String> {
     if let Some(captures) = Regex::new(r"[?&]v=([^&]+)").unwrap().captures(url) {
         return Some(captures[1].to_string());
     }
-    
+
     // For youtu.be/ID
     if let Some(captures) = Regex::new(r"youtu\.be/([^?]+)").unwrap().captures(url) {
         return Some(captures[1].to_string());
     }
-    
+
     None
 }
 
@@ -129,12 +129,12 @@ pub fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", size as u64, UNITS[unit_index])
     } else {
@@ -147,7 +147,7 @@ pub fn calculate_speed(bytes: u64, duration_secs: f64) -> String {
     if duration_secs <= 0.0 {
         return "0 B/s".to_string();
     }
-    
+
     let bytes_per_sec = bytes as f64 / duration_secs;
     format!("{}/s", format_bytes(bytes_per_sec as u64))
 }
@@ -157,12 +157,16 @@ pub fn estimate_eta(total_bytes: u64, downloaded_bytes: u64, speed_bytes_per_sec
     if speed_bytes_per_sec <= 0.0 || downloaded_bytes >= total_bytes {
         return "Unknown".to_string();
     }
-    
+
     let remaining_bytes = total_bytes - downloaded_bytes;
     let eta_seconds = remaining_bytes as f64 / speed_bytes_per_sec;
-    
+
     if eta_seconds > 3600.0 {
-        format!("{:.0}h {:.0}m", eta_seconds / 3600.0, (eta_seconds % 3600.0) / 60.0)
+        format!(
+            "{:.0}h {:.0}m",
+            eta_seconds / 3600.0,
+            (eta_seconds % 3600.0) / 60.0
+        )
     } else if eta_seconds > 60.0 {
         format!("{:.0}m {:.0}s", eta_seconds / 60.0, eta_seconds % 60.0)
     } else {
@@ -188,7 +192,10 @@ pub fn get_file_extension(path: &Path) -> Option<String> {
 /// Check if file has video extension
 pub fn is_video_file(path: &Path) -> bool {
     if let Some(ext) = get_file_extension(path) {
-        matches!(ext.as_str(), "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm")
+        matches!(
+            ext.as_str(),
+            "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm"
+        )
     } else {
         false
     }
@@ -229,21 +236,35 @@ mod tests {
 
     #[test]
     fn test_validate_youtube_url() {
-        assert!(is_valid_youtube_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+        assert!(is_valid_youtube_url(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        ));
         assert!(is_valid_youtube_url("https://youtu.be/dQw4w9WgXcQ"));
         assert!(!is_valid_youtube_url("https://example.com"));
     }
 
     #[test]
     fn test_validate_spotify_playlist_url() {
-        assert!(crate::spotify::is_valid_spotify_playlist_url("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"));
-        assert!(crate::spotify::is_valid_spotify_playlist_url("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"));
-        assert!(!crate::spotify::is_valid_spotify_playlist_url("https://open.spotify.com/track/37i9dQZF1DXcBWIGoYBM5M"));
+        assert!(crate::spotify::is_valid_spotify_playlist_url(
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        ));
+        assert!(crate::spotify::is_valid_spotify_playlist_url(
+            "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"
+        ));
+        assert!(!crate::spotify::is_valid_spotify_playlist_url(
+            "https://open.spotify.com/track/37i9dQZF1DXcBWIGoYBM5M"
+        ));
     }
 
     #[test]
     fn test_extract_video_id() {
-        assert_eq!(extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), Some("dQw4w9WgXcQ".to_string()));
-        assert_eq!(extract_video_id("https://youtu.be/dQw4w9WgXcQ"), Some("dQw4w9WgXcQ".to_string()));
+        assert_eq!(
+            extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            Some("dQw4w9WgXcQ".to_string())
+        );
+        assert_eq!(
+            extract_video_id("https://youtu.be/dQw4w9WgXcQ"),
+            Some("dQw4w9WgXcQ".to_string())
+        );
     }
 }

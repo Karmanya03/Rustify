@@ -1,9 +1,9 @@
-use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use std::sync::{Arc, Mutex};
 use tracing::info;
+use uuid::Uuid;
 
 use crate::{EzP3, OutputFormat, PlaylistInfo};
 
@@ -141,10 +141,10 @@ impl BatchProcessor {
         options: BatchOptions,
     ) -> Result<String, anyhow::Error> {
         let job_id = Uuid::new_v4().to_string();
-        
+
         // Get playlist info
         let playlist_info = self.ezp3.get_playlist_info(&playlist_url).await?;
-        
+
         let job = BatchJob {
             id: job_id.clone(),
             name,
@@ -163,15 +163,15 @@ impl BatchProcessor {
 
         // Store job
         self.jobs.lock().unwrap().insert(job_id.clone(), job);
-        
+
         // Create tasks for each video/format combination
         let mut tasks = Vec::new();
         let videos = self.filter_videos(&playlist_info, &self.get_job(&job_id).unwrap().options);
-        
+
         for (index, video) in videos.iter().enumerate() {
             let task_id = Uuid::new_v4().to_string();
             let mut format_tasks = Vec::new();
-            
+
             for batch_format in &self.get_job(&job_id).unwrap().formats {
                 if batch_format.enabled {
                     let output_path = self.generate_output_path(
@@ -181,7 +181,7 @@ impl BatchProcessor {
                         &batch_format.format,
                         &self.get_job(&job_id).unwrap().options,
                     );
-                    
+
                     format_tasks.push(BatchTaskFormat {
                         format: batch_format.format.clone(),
                         quality: batch_format.quality.clone(),
@@ -192,7 +192,7 @@ impl BatchProcessor {
                     });
                 }
             }
-            
+
             tasks.push(BatchTask {
                 id: task_id,
                 job_id: job_id.clone(),
@@ -206,36 +206,40 @@ impl BatchProcessor {
                 completed_at: None,
             });
         }
-        
+
         self.tasks.lock().unwrap().insert(job_id.clone(), tasks);
-        
+
         Ok(job_id)
     }
 
     /// Start batch conversion
-    pub async fn start_batch<F>(&self, job_id: &str, _progress_callback: F) -> Result<(), anyhow::Error>
+    pub async fn start_batch<F>(
+        &self,
+        job_id: &str,
+        _progress_callback: F,
+    ) -> Result<(), anyhow::Error>
     where
         F: Fn(BatchProgress) + Send + Sync + 'static,
     {
         info!("Starting batch conversion for job: {}", job_id);
-        
+
         // For now, this is a simplified implementation
         // In a real implementation, you would:
         // 1. Update job status to Running
         // 2. Process each task with the converter
         // 3. Update progress as you go
         // 4. Handle errors and retries
-        
+
         // Update job status
         if let Some(mut job) = self.get_job(job_id) {
             job.status = BatchJobStatus::Running;
             job.started_at = Some(chrono::Utc::now());
             self.jobs.lock().unwrap().insert(job_id.to_string(), job);
         }
-        
+
         // Simulate processing
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        
+
         // Mark as completed
         if let Some(mut job) = self.get_job(job_id) {
             job.status = BatchJobStatus::Completed;
@@ -243,7 +247,7 @@ impl BatchProcessor {
             job.completed_videos = job.total_videos;
             self.jobs.lock().unwrap().insert(job_id.to_string(), job);
         }
-        
+
         info!("Batch conversion completed for job: {}", job_id);
         Ok(())
     }
@@ -255,7 +259,9 @@ impl BatchProcessor {
 
     /// Get tasks for a job
     pub fn get_job_tasks(&self, job_id: &str) -> Vec<BatchTask> {
-        self.tasks.lock().unwrap()
+        self.tasks
+            .lock()
+            .unwrap()
             .get(job_id)
             .cloned()
             .unwrap_or_default()
@@ -275,15 +281,16 @@ impl BatchProcessor {
         } else {
             video.title.clone()
         };
-        
+
         // Sanitize filename
-        filename = filename.chars()
+        filename = filename
+            .chars()
             .map(|c| match c {
                 '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
                 c => c,
             })
             .collect();
-        
+
         let extension = match format {
             OutputFormat::Mp3 { .. } => "mp3",
             OutputFormat::Mp4 { .. } => "mp4",
@@ -293,21 +300,26 @@ impl BatchProcessor {
             OutputFormat::Ogg { .. } => "ogg",
             OutputFormat::WebM { .. } => "webm",
         };
-        
+
         output_dir.join(format!("{}.{}", filename, extension))
     }
 
     /// Filter videos based on batch options
-    fn filter_videos<'a>(&self, playlist_info: &'a PlaylistInfo, options: &BatchOptions) -> Vec<&'a crate::PlaylistVideo> {
-        let mut videos: Vec<&crate::PlaylistVideo> = playlist_info.videos
+    fn filter_videos<'a>(
+        &self,
+        playlist_info: &'a PlaylistInfo,
+        options: &BatchOptions,
+    ) -> Vec<&'a crate::PlaylistVideo> {
+        let mut videos: Vec<&crate::PlaylistVideo> = playlist_info
+            .videos
             .iter()
             .skip(options.start_index)
             .collect();
-        
+
         if let Some(limit) = options.video_limit {
             videos.truncate(limit);
         }
-        
+
         videos
     }
 }

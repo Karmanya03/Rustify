@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use regex::Regex;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 // YouTube URL validation
 #[allow(dead_code)]
@@ -44,7 +44,8 @@ pub fn validate_format(format: &str) -> Result<()> {
 #[allow(dead_code)]
 pub fn validate_quality(quality: &str) -> Result<()> {
     match quality {
-        "lossless" | "hd" | "144p" | "240p" | "360p" | "480p" | "720p" | "1080p" | "1440p" | "2160p" | "best" | "worst" => Ok(()),
+        "lossless" | "hd" | "144p" | "240p" | "360p" | "480p" | "720p" | "1080p" | "1440p"
+        | "2160p" | "best" | "worst" => Ok(()),
         _ => Err(anyhow!("Invalid quality setting")),
     }
 }

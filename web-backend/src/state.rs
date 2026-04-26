@@ -52,7 +52,12 @@ impl AppState {
         let (task_updates, _) = broadcast::channel(100);
         let mut config = AppConfig::default();
         let allow_browser_cookies = std::env::var("RUSTIFY_WEB_ALLOW_BROWSER_COOKIES")
-            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes"
+                )
+            })
             .unwrap_or(false);
         if !allow_browser_cookies {
             config.auth.mode = AuthMode::None;

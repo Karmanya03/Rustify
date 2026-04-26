@@ -155,7 +155,8 @@ fn build_playlist_conversion_settings(
     quality: &str,
 ) -> Vec<ConversionSettings> {
     let extension = get_extension_for_format(format);
-    let index_width = playlist_index_width(playlist_info.video_count.max(playlist_info.videos.len()));
+    let index_width =
+        playlist_index_width(playlist_info.video_count.max(playlist_info.videos.len()));
 
     playlist_info
         .videos

@@ -26,11 +26,7 @@ pub fn display_video_info(info: &VideoInfo) {
     println!("Formats    : {}", info.formats.len());
 }
 
-pub fn display_quality_options(
-    qualities: &QualityOptions,
-    audio_only: bool,
-    video_only: bool,
-) {
+pub fn display_quality_options(qualities: &QualityOptions, audio_only: bool, video_only: bool) {
     if !video_only {
         println!("Audio:");
         if qualities.audio_qualities.is_empty() {

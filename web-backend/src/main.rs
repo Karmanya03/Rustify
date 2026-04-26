@@ -11,6 +11,7 @@ use axum::{
 };
 use state::AppState;
 use std::net::SocketAddr;
+use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
@@ -18,7 +19,6 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{info, Level};
-use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -47,24 +47,33 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/playlist", post(handlers::convert_playlist))
         .route("/api/tasks", get(handlers::get_all_tasks))
         .route("/api/tasks/{id}", get(handlers::get_task))
-        .route("/api/tasks/{id}", axum::routing::delete(handlers::cancel_task))
+        .route(
+            "/api/tasks/{id}",
+            axum::routing::delete(handlers::cancel_task),
+        )
         .route("/api/download/{id}", get(handlers::download_file))
-        .route("/api/download/{task_id}/{file_index}", get(handlers::download_playlist_file))
+        .route(
+            "/api/download/{task_id}/{file_index}",
+            get(handlers::download_playlist_file),
+        )
         .route("/api/health", get(handlers::health_check))
         .route("/api/dependencies", get(handlers::dependency_check))
-        .route("/api/clear-completed", post(handlers::clear_completed_tasks))
+        .route(
+            "/api/clear-completed",
+            post(handlers::clear_completed_tasks),
+        )
         .route("/api/clear-all", post(handlers::clear_all_tasks))
         .route("/health", get(handlers::health_check))
         .route("/ws", get(websocket::websocket_handler))
         .layer(
             ServiceBuilder::new()
-                .layer(middleware::from_fn(security::headers::security_headers_middleware))
+                .layer(middleware::from_fn(
+                    security::headers::security_headers_middleware,
+                ))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors),
         )
-        .fallback_service(
-            ServeDir::new("./dist").fallback(ServeFile::new("./dist/index.html")),
-        )
+        .fallback_service(ServeDir::new("./dist").fallback(ServeFile::new("./dist/index.html")))
         .with_state(state);
 
     let port = std::env::var("PORT")

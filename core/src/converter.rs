@@ -76,8 +76,12 @@ impl Converter {
             bitrate: None,
         });
 
-        info!("Starting conversion: {} -> {:?}", settings.input_url, settings.output_path);
-        self.download_and_convert(&settings, callback.clone()).await?;
+        info!(
+            "Starting conversion: {} -> {:?}",
+            settings.input_url, settings.output_path
+        );
+        self.download_and_convert(&settings, callback.clone())
+            .await?;
         info!("Conversion completed successfully");
         Ok(())
     }
@@ -91,7 +95,10 @@ impl Converter {
     where
         F: Fn(usize, ConversionProgress) + Send + Sync + 'static + Clone,
     {
-        info!("Starting batch conversion of {} videos", settings_list.len());
+        info!(
+            "Starting batch conversion of {} videos",
+            settings_list.len()
+        );
 
         let mut results = Vec::with_capacity(settings_list.len());
         let total = settings_list.len();
@@ -184,9 +191,10 @@ impl Converter {
                 )
                 .await
             }
-            _ => self
-                .run_ytdlp_direct(settings, &temp_dir, progress_callback.clone())
-                .await,
+            _ => {
+                self.run_ytdlp_direct(settings, &temp_dir, progress_callback.clone())
+                    .await
+            }
         };
 
         if let Err(error) = tokio::fs::remove_dir_all(&temp_dir).await {

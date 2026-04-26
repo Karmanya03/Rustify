@@ -109,7 +109,10 @@ pub async fn get_video_info(
     Ok(Json(VideoInfo {
         title: info.title,
         duration: Some(format_duration(info.duration)),
-        thumbnail: info.thumbnails.first().map(|thumbnail| thumbnail.url.clone()),
+        thumbnail: info
+            .thumbnails
+            .first()
+            .map(|thumbnail| thumbnail.url.clone()),
         uploader: Some(info.uploader),
         view_count: info.view_count,
         video_count: None,
@@ -306,7 +309,8 @@ pub async fn convert_playlist(
                     let state = state_clone.clone();
                     let task_id = task_id.clone();
                     move |index, progress| {
-                        let overall = (((index as f64) + (progress.percentage / 100.0)) / total_videos)
+                        let overall = (((index as f64) + (progress.percentage / 100.0))
+                            / total_videos)
                             * 100.0;
                         let state = state.clone();
                         let task_id = task_id.clone();
@@ -331,7 +335,9 @@ pub async fn convert_playlist(
         match result {
             Ok(results) => {
                 let failed = results.iter().filter(|result| result.is_err()).count();
-                let files = collect_playlist_files(&output_dir_for_collect).await.unwrap_or_default();
+                let files = collect_playlist_files(&output_dir_for_collect)
+                    .await
+                    .unwrap_or_default();
                 update_task(&state_clone, &task_id, |task| {
                     task.status = if failed == 0 {
                         "completed".to_string()
@@ -597,6 +603,7 @@ fn extension_for_format(format: &OutputFormat) -> &'static str {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn ensure_youtube_url(url: &str) -> Result<(), Response> {
     if is_valid_youtube_url(url) {
         Ok(())
@@ -605,6 +612,7 @@ fn ensure_youtube_url(url: &str) -> Result<(), Response> {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn ensure_playlist_url(url: &str) -> Result<(), Response> {
     if is_supported_playlist_url(url) {
         Ok(())
@@ -615,6 +623,7 @@ fn ensure_playlist_url(url: &str) -> Result<(), Response> {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn ensure_info_url(url: &str) -> Result<(), Response> {
     if is_valid_youtube_url(url) || is_valid_spotify_playlist_url(url) {
         Ok(())
@@ -664,11 +673,7 @@ async fn apply_progress_update(state: &AppState, task_id: &str, progress: &Conve
     });
 }
 
-async fn update_task(
-    state: &AppState,
-    task_id: &str,
-    mut update: impl FnMut(&mut TaskResponse),
-) {
+async fn update_task(state: &AppState, task_id: &str, mut update: impl FnMut(&mut TaskResponse)) {
     let mut tasks = state.tasks.lock().await;
     if let Some(task) = tasks.get_mut(task_id) {
         update(task);

@@ -1,5 +1,5 @@
+use crate::{FormatInfo, VideoInfo};
 use serde::{Deserialize, Serialize};
-use crate::{VideoInfo, FormatInfo};
 
 /// Available quality options for a video
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,7 +96,7 @@ pub fn analyze_available_qualities(info: &VideoInfo) -> QualityOptions {
 fn parse_audio_quality(format: &FormatInfo) -> Option<AudioQuality> {
     let codec = format.acodec.as_ref()?.clone();
     let bitrate = format.abr.unwrap_or(128.0) as u32;
-    
+
     // Determine format from codec
     let format_name = match codec.as_str() {
         "mp3" | "libmp3lame" => "MP3",
@@ -122,7 +122,7 @@ fn parse_video_quality(format: &FormatInfo) -> Option<VideoQuality> {
     let width = format.width?;
     let height = format.height?;
     let codec = format.vcodec.as_ref()?.clone();
-    
+
     let resolution = match height {
         2160 => "4K (2160p)".to_string(),
         1440 => "1440p".to_string(),
@@ -149,87 +149,100 @@ fn parse_video_quality(format: &FormatInfo) -> Option<VideoQuality> {
 }
 
 /// Get optimal quality settings based on preset
-pub fn get_preset_settings(preset: QualityPreset, available: &QualityOptions) -> (Option<u32>, Option<String>) {
+pub fn get_preset_settings(
+    preset: QualityPreset,
+    available: &QualityOptions,
+) -> (Option<u32>, Option<String>) {
     match preset {
         QualityPreset::Best => {
             let audio_bitrate = available.best_audio.as_ref().map(|a| a.bitrate);
             let video_resolution = available.best_video.as_ref().map(|v| v.resolution.clone());
             (audio_bitrate, video_resolution)
         }
-        
+
         QualityPreset::Good => {
             // Select second-best or 256kbps audio and 1080p video
-            let audio_bitrate = available.audio_qualities
+            let audio_bitrate = available
+                .audio_qualities
                 .iter()
                 .find(|a| a.bitrate <= 256)
                 .or(available.audio_qualities.get(1))
                 .map(|a| a.bitrate);
-                
-            let video_resolution = available.video_qualities
+
+            let video_resolution = available
+                .video_qualities
                 .iter()
                 .find(|v| v.height <= 1080)
                 .map(|v| v.resolution.clone());
-                
+
             (audio_bitrate, video_resolution)
         }
-        
+
         QualityPreset::Standard => {
             // 192kbps audio and 720p video
-            let audio_bitrate = available.audio_qualities
+            let audio_bitrate = available
+                .audio_qualities
                 .iter()
                 .find(|a| a.bitrate <= 192)
                 .map(|a| a.bitrate)
                 .or(Some(192));
-                
-            let video_resolution = available.video_qualities
+
+            let video_resolution = available
+                .video_qualities
                 .iter()
                 .find(|v| v.height <= 720)
                 .map(|v| v.resolution.clone())
                 .or(Some("720p".to_string()));
-                
+
             (audio_bitrate, video_resolution)
         }
-        
+
         QualityPreset::Low => {
             // 128kbps audio and 480p video
             let audio_bitrate = Some(128);
-            let video_resolution = available.video_qualities
+            let video_resolution = available
+                .video_qualities
                 .iter()
                 .find(|v| v.height <= 480)
                 .map(|v| v.resolution.clone())
                 .or(Some("480p".to_string()));
-                
+
             (audio_bitrate, video_resolution)
         }
-        
-        QualityPreset::Custom { audio_bitrate, video_resolution } => {
-            (audio_bitrate, video_resolution)
-        }
+
+        QualityPreset::Custom {
+            audio_bitrate,
+            video_resolution,
+        } => (audio_bitrate, video_resolution),
     }
 }
 
 /// Estimate file size based on quality settings
-pub fn estimate_file_size(duration_seconds: u64, audio_bitrate: Option<u32>, video_resolution: Option<&str>) -> u64 {
+pub fn estimate_file_size(
+    duration_seconds: u64,
+    audio_bitrate: Option<u32>,
+    video_resolution: Option<&str>,
+) -> u64 {
     let mut total_bitrate = 0u32;
-    
+
     // Add audio bitrate
     if let Some(audio_br) = audio_bitrate {
         total_bitrate += audio_br;
     }
-    
+
     // Estimate video bitrate based on resolution
     if let Some(resolution) = video_resolution {
         let video_bitrate = match resolution {
             s if s.contains("2160") || s.contains("4K") => 15000, // 15 Mbps for 4K
-            s if s.contains("1440") => 8000,  // 8 Mbps for 1440p
-            s if s.contains("1080") => 4000,  // 4 Mbps for 1080p
-            s if s.contains("720") => 2000,   // 2 Mbps for 720p
-            s if s.contains("480") => 1000,   // 1 Mbps for 480p
-            _ => 500,                         // 500 kbps for lower resolutions
+            s if s.contains("1440") => 8000,                      // 8 Mbps for 1440p
+            s if s.contains("1080") => 4000,                      // 4 Mbps for 1080p
+            s if s.contains("720") => 2000,                       // 2 Mbps for 720p
+            s if s.contains("480") => 1000,                       // 1 Mbps for 480p
+            _ => 500,                                             // 500 kbps for lower resolutions
         };
         total_bitrate += video_bitrate;
     }
-    
+
     // Convert to bytes: (bitrate in kbps * duration in seconds) / 8 / 1000
     (total_bitrate as u64 * duration_seconds * 1000) / 8
 }
@@ -239,12 +252,12 @@ pub fn format_file_size(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", size as u64, UNITS[unit_index])
     } else {

@@ -138,7 +138,9 @@ pub async fn run_ytdlp_capture(config: &AppConfig, args: &[String]) -> Result<Ca
             combined.trim()
         ));
 
-        if attempt.public_attempt && config.auth.mode == AuthMode::Auto && looks_like_auth_error(&combined)
+        if attempt.public_attempt
+            && config.auth.mode == AuthMode::Auto
+            && looks_like_auth_error(&combined)
         {
             continue;
         }
@@ -171,9 +173,10 @@ pub async fn run_ytdlp_with_progress(
         command.args(&attempt.extra_args);
         command.args(args);
 
-        let (status, stdout, stderr) = capture_command_output(command, Some(progress_callback.clone()))
-            .await
-            .with_context(|| format!("Failed to execute {}", spec.display()))?;
+        let (status, stdout, stderr) =
+            capture_command_output(command, Some(progress_callback.clone()))
+                .await
+                .with_context(|| format!("Failed to execute {}", spec.display()))?;
 
         if status.success() {
             return Ok(CapturedOutput { stdout, stderr });
@@ -186,7 +189,9 @@ pub async fn run_ytdlp_with_progress(
             combined.trim()
         ));
 
-        if attempt.public_attempt && config.auth.mode == AuthMode::Auto && looks_like_auth_error(&combined)
+        if attempt.public_attempt
+            && config.auth.mode == AuthMode::Auto
+            && looks_like_auth_error(&combined)
         {
             continue;
         }
@@ -345,20 +350,16 @@ fn yt_dlp_attempts(config: &AppConfig) -> Vec<YtDlpAttempt> {
                 });
             }
 
-            attempts.extend(
-                config
-                    .auth
-                    .browser_candidates()
-                    .into_iter()
-                    .map(|browser| YtDlpAttempt {
-                        label: format!("browser:{}", browser.as_yt_dlp_name()),
-                        extra_args: vec![
-                            "--cookies-from-browser".to_string(),
-                            browser.as_yt_dlp_name().to_string(),
-                        ],
-                        public_attempt: false,
-                    }),
-            );
+            attempts.extend(config.auth.browser_candidates().into_iter().map(|browser| {
+                YtDlpAttempt {
+                    label: format!("browser:{}", browser.as_yt_dlp_name()),
+                    extra_args: vec![
+                        "--cookies-from-browser".to_string(),
+                        browser.as_yt_dlp_name().to_string(),
+                    ],
+                    public_attempt: false,
+                }
+            }));
 
             attempts
         }

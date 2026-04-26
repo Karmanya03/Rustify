@@ -41,28 +41,40 @@ async fn convert_video(rustify: &EzP3, args: ConvertArgs, output_dir: PathBuf) -
     let info = rustify.get_video_info(&args.url).await?;
     let format = parse_output_format(&args.format, &args.quality)?;
     let extension = extension_for_format(&format);
-    let filename = args
-        .name
-        .unwrap_or_else(|| sanitize_filename(&info.title));
+    let filename = args.name.unwrap_or_else(|| sanitize_filename(&info.title));
     let output_path = output_dir.join(format!("{filename}.{extension}"));
 
     println!("{}", "Starting conversion".cyan().bold());
     println!("Title   : {}", info.title.green());
-    println!("Format  : {} ({})", args.format.to_uppercase(), args.quality);
+    println!(
+        "Format  : {} ({})",
+        args.format.to_uppercase(),
+        args.quality
+    );
     println!("Output  : {}", output_path.display());
 
     let progress_bar = ui::create_progress_bar(100);
     let progress_bar_handle = progress_bar.clone();
 
     rustify
-        .convert_video(&args.url, output_path.clone(), format, &args.quality, move |progress| {
-            progress_bar_handle.set_position(progress.percentage.round() as u64);
-            progress_bar_handle.set_message(format!("{} | ETA {}", progress.speed, progress.eta));
-        })
+        .convert_video(
+            &args.url,
+            output_path.clone(),
+            format,
+            &args.quality,
+            move |progress| {
+                progress_bar_handle.set_position(progress.percentage.round() as u64);
+                progress_bar_handle
+                    .set_message(format!("{} | ETA {}", progress.speed, progress.eta));
+            },
+        )
         .await?;
 
     progress_bar.finish_with_message("Done");
-    println!("{}", format!("Saved to {}", output_path.display()).green().bold());
+    println!(
+        "{}",
+        format!("Saved to {}", output_path.display()).green().bold()
+    );
     Ok(())
 }
 
@@ -76,7 +88,11 @@ async fn convert_playlist(rustify: &EzP3, args: PlaylistArgs, output_dir: PathBu
     println!("{}", "Starting playlist conversion".cyan().bold());
     println!("Playlist : {}", playlist.title.green());
     println!("Videos   : {}", selected_videos.len());
-    println!("Format   : {} ({})", args.format.to_uppercase(), args.quality);
+    println!(
+        "Format   : {} ({})",
+        args.format.to_uppercase(),
+        args.quality
+    );
 
     let mut succeeded = 0usize;
     let mut failed = 0usize;
@@ -97,18 +113,27 @@ async fn convert_playlist(rustify: &EzP3, args: PlaylistArgs, output_dir: PathBu
 
         if output_exists(&output_path).await {
             progress_bar.finish_with_message("Skipped");
-            println!("{}", format!("Already exists: {}", output_path.display()).yellow());
+            println!(
+                "{}",
+                format!("Already exists: {}", output_path.display()).yellow()
+            );
             succeeded += 1;
             maybe_pause_between_jobs(rustify, index + 1 < selected_videos.len()).await;
             continue;
         }
 
         match rustify
-            .convert_video(&video.url, output_path.clone(), format.clone(), &args.quality, move |progress| {
-                progress_bar_handle.set_position(progress.percentage.round() as u64);
-                progress_bar_handle
-                    .set_message(format!("{} | ETA {}", progress.speed, progress.eta));
-            })
+            .convert_video(
+                &video.url,
+                output_path.clone(),
+                format.clone(),
+                &args.quality,
+                move |progress| {
+                    progress_bar_handle.set_position(progress.percentage.round() as u64);
+                    progress_bar_handle
+                        .set_message(format!("{} | ETA {}", progress.speed, progress.eta));
+                },
+            )
             .await
         {
             Ok(()) => {
@@ -167,7 +192,10 @@ async fn batch_convert(rustify: &EzP3, args: BatchArgs, output_dir: PathBuf) -> 
 
             if output_exists(&output_path).await {
                 progress_bar.finish_with_message("Skipped");
-                println!("{}", format!("Already exists: {}", output_path.display()).yellow());
+                println!(
+                    "{}",
+                    format!("Already exists: {}", output_path.display()).yellow()
+                );
                 succeeded += 1;
                 processed_jobs += 1;
                 maybe_pause_between_jobs(rustify, processed_jobs < total_jobs).await;
@@ -175,11 +203,17 @@ async fn batch_convert(rustify: &EzP3, args: BatchArgs, output_dir: PathBuf) -> 
             }
 
             match rustify
-                .convert_video(&video.url, output_path.clone(), format.clone(), quality, move |progress| {
-                    progress_bar_handle.set_position(progress.percentage.round() as u64);
-                    progress_bar_handle
-                        .set_message(format!("{} | ETA {}", progress.speed, progress.eta));
-                })
+                .convert_video(
+                    &video.url,
+                    output_path.clone(),
+                    format.clone(),
+                    quality,
+                    move |progress| {
+                        progress_bar_handle.set_position(progress.percentage.round() as u64);
+                        progress_bar_handle
+                            .set_message(format!("{} | ETA {}", progress.speed, progress.eta));
+                    },
+                )
                 .await
             {
                 Ok(()) => {
@@ -326,11 +360,11 @@ fn is_playlist_url(url: &str) -> bool {
     url.contains("playlist?list=") || is_valid_spotify_playlist_url(url)
 }
 
-fn select_playlist_videos<'a>(
-    videos: &'a [PlaylistVideo],
+fn select_playlist_videos(
+    videos: &[PlaylistVideo],
     start: usize,
     limit: Option<usize>,
-) -> Vec<&'a PlaylistVideo> {
+) -> Vec<&PlaylistVideo> {
     let offset = start.saturating_sub(1);
     let mut selected = videos.iter().skip(offset).collect::<Vec<_>>();
     if let Some(limit) = limit {
@@ -379,7 +413,11 @@ fn parse_batch_formats(
     let quality_map = qualities.unwrap_or_default();
     let mut parsed = Vec::new();
 
-    for format_name in formats.split(',').map(str::trim).filter(|value| !value.is_empty()) {
+    for format_name in formats
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
         let quality = quality_for_format(quality_map, format_name)
             .unwrap_or_else(|| default_quality_for_format(format_name).to_string());
         let format = parse_output_format(format_name, &quality)?;

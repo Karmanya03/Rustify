@@ -288,6 +288,7 @@ impl BatchProcessor {
             OutputFormat::Mp3 { .. } => "mp3",
             OutputFormat::Mp4 { .. } => "mp4",
             OutputFormat::Flac => "flac",
+            OutputFormat::Wav => "wav",
             OutputFormat::Aac { .. } => "aac",
             OutputFormat::Ogg { .. } => "ogg",
             OutputFormat::WebM { .. } => "webm",

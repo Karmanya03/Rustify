@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::state::{AppState, TaskStatus};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -20,17 +20,14 @@ pub async fn websocket_handler(
 async fn websocket_connection(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
     let mut task_updates = state.subscribe_to_updates();
-    
+
     info!("New WebSocket connection established");
-    
-    // Handle incoming messages and broadcast updates
+
     loop {
         tokio::select! {
-            // Handle incoming WebSocket messages
             msg = receiver.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        // Handle client messages (e.g., ping, subscribe to specific tasks)
                         if text == "ping"
                             && sender.send(Message::Text("pong".to_string().into())).await.is_err() {
                                 break;
@@ -40,13 +37,12 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                         info!("WebSocket connection closed by client");
                         break;
                     }
-                    Some(Err(e)) => {
-                        // Check if it's a normal connection reset (user closed browser)
-                        let error_msg = e.to_string();
-                        if error_msg.contains("Connection reset") || error_msg.contains("close handshake") {
-                            info!("WebSocket client disconnected (browser closed): {}", e);
+                    Some(Err(error)) => {
+                        let error_message = error.to_string();
+                        if error_message.contains("Connection reset") || error_message.contains("close handshake") {
+                            info!("WebSocket client disconnected: {}", error);
                         } else {
-                            error!("WebSocket error: {}", e);
+                            error!("WebSocket error: {}", error);
                         }
                         break;
                     }
@@ -54,28 +50,41 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                     _ => {}
                 }
             }
-            
-            // Handle task updates
             update = task_updates.recv() => {
                 match update {
                     Ok(task_update) => {
-                        if let Ok(message) = serde_json::to_string(&task_update) {
-                            if sender.send(Message::Text(message.into())).await.is_err() {
-                                warn!("Failed to send task update, client disconnected");
-                                break;
-                            }
+                        let message_type = match &task_update.status {
+                            TaskStatus::Completed => "task_completed",
+                            TaskStatus::Failed(_) => "task_failed",
+                            _ => "progress_update",
+                        };
+
+                        let payload = serde_json::json!({
+                            "type": message_type,
+                            "task_id": task_update.task_id,
+                            "status": task_update.status,
+                            "progress": task_update.progress,
+                            "speed": task_update.speed,
+                            "eta": task_update.eta,
+                        });
+
+                        if sender
+                            .send(Message::Text(payload.to_string().into()))
+                            .await
+                            .is_err()
+                        {
+                            warn!("Failed to send task update, client disconnected");
+                            break;
                         }
                     }
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        warn!("WebSocket client lagged behind by {} messages", n);
+                    Err(broadcast::error::RecvError::Lagged(count)) => {
+                        warn!("WebSocket client lagged by {} messages", count);
                     }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        break;
-                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
         }
     }
-    
+
     info!("WebSocket connection closed");
 }

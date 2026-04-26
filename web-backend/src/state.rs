@@ -1,19 +1,23 @@
-use std::collections::HashMap;
-use tokio::sync::{Mutex, broadcast};
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use rustify_core::{AppConfig, AuthMode, EzP3};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::{broadcast, Mutex};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
+    pub rustify: Arc<EzP3>,
     pub tasks: Arc<Mutex<HashMap<String, TaskResponse>>>,
     pub task_updates: broadcast::Sender<TaskUpdate>,
-    pub downloads_dir: String,
+    pub downloads_dir: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TaskResponse {
     pub id: String,
+    pub title: Option<String>,
     pub url: String,
     pub format: String,
     pub quality: String,
@@ -22,7 +26,7 @@ pub struct TaskResponse {
     pub created_at: DateTime<Utc>,
     pub output_path: Option<String>,
     pub file_path: Option<String>,
-    pub playlist_files: Option<Vec<String>>, // For playlist downloads - stores all file paths
+    pub playlist_files: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,7 +39,6 @@ pub struct TaskUpdate {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[allow(dead_code)]
 pub enum TaskStatus {
     Pending,
     Converting,
@@ -47,19 +50,22 @@ pub enum TaskStatus {
 impl AppState {
     pub async fn new() -> anyhow::Result<Self> {
         let (task_updates, _) = broadcast::channel(100);
-        
-        // Simple dependency check without extra warnings
-        if let Err(e) = crate::youtube::check_dependencies().await {
-            tracing::warn!("YouTube downloader dependencies check failed: {}", e);
+        let mut config = AppConfig::default();
+        let allow_browser_cookies = std::env::var("RUSTIFY_WEB_ALLOW_BROWSER_COOKIES")
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(false);
+        if !allow_browser_cookies {
+            config.auth.mode = AuthMode::None;
         }
-        
+        let rustify = EzP3::with_config(config)?;
         let downloads_dir = std::env::var("DOWNLOADS_DIR")
-            .unwrap_or_else(|_| "./downloads".to_string());
-        
-        // Create downloads directory if it doesn't exist
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("./downloads"));
+
         tokio::fs::create_dir_all(&downloads_dir).await?;
-        
+
         Ok(Self {
+            rustify: Arc::new(rustify),
             tasks: Arc::new(Mutex::new(HashMap::new())),
             task_updates,
             downloads_dir,
@@ -68,16 +74,5 @@ impl AppState {
 
     pub fn subscribe_to_updates(&self) -> broadcast::Receiver<TaskUpdate> {
         self.task_updates.subscribe()
-    }
-
-    #[allow(dead_code)]
-    pub async fn get_all_tasks(&self) -> Vec<TaskResponse> {
-        let tasks = self.tasks.lock().await;
-        tasks.values().cloned().collect()
-    }
-
-    #[allow(dead_code)]
-    pub async fn broadcast_update(&self, update: TaskUpdate) {
-        let _ = self.task_updates.send(update);
     }
 }

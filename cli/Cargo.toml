@@ -1,16 +1,16 @@
 [package]
-name = "ezp3-cli"
+name = "rustify-cli"
 version = "0.1.0"
 edition = "2021"
-description = "Command-line interface for EzP3 YouTube converter"
+description = "Command-line interface for Rustify"
 license = "MIT"
 
 [[bin]]
-name = "ezp3"
+name = "rustify"
 path = "src/main.rs"
 
 [dependencies]
-ezp3-core = { path = "../core" }
+rustify-core = { path = "../core" }
 tokio = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
@@ -18,9 +18,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-indicatif = "0.17"
-console = "0.15"
-dialoguer = "0.10"
-dirs = "5.0"
-colored = "2.0"
+indicatif = "0.17.11"
+console = "0.15.11"
+dirs = "5.0.1"
+colored = "2.2.0"
 chrono = { workspace = true }

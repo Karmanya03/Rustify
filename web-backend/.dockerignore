@@ -1,0 +1,85 @@
+# Docker ignore file for Rustify web-backend
+
+# Target directory (build artifacts)
+target/
+**/target/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README*.md
+CHANGELOG.md
+LICENSE
+*.md
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Downloads and output files
+downloads/
+*.mp3
+*.mp4
+*.wav
+*.webm
+
+# Test files
+tests/
+**/tests/
+**/*_test.rs
+**/*_tests.rs
+
+# Security files
+*.key
+*.pem
+*.crt
+certificates/
+private_keys/
+
+# Node modules (if any)
+node_modules/
+
+# Build caches
+.cache/
+.cargo/cache/
+
+# IDE files
+*.sublime-*
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Local development
+.local/
+dev/
+development/

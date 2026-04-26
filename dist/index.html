@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rustify - YouTube Converter</title>
+    <title>Rustify - Local Media Converter</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -1168,7 +1168,7 @@
     <div class="container">
         <div class="header">
             <h1>Rustify</h1>
-            <p>Modern YouTube Video & Playlist Converter made on Rust.</p>
+            <p>Modern Rust media converter for YouTube plus Spotify playlist imports.</p>
         </div>
         
         <div class="content">
@@ -1198,6 +1198,30 @@
                     </div>
                 </button>
             </div>
+
+            <div class="input-group" style="margin-bottom: 1.5rem;">
+                <label>Local Auth & Output</label>
+                <div style="padding: 12px 14px; border-radius: 12px; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255,255,255,0.12); color: #dbeafe; line-height: 1.5;">
+                    <i class="fas fa-shield-alt" style="margin-right: 8px; color: #60a5fa;"></i>
+                    Rustify reuses the signed-in browser session on your own machine only when YouTube asks for it. No hardcoded cookies, no bundled account secrets, and manual cookie files stay optional.
+                </div>
+                <div id="desktop-output-group" style="display: none; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255,255,255,0.12);">
+                    <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                        <div>
+                            <div style="font-weight: 600; color: #f8fafc;">Desktop Save Folder</div>
+                            <div id="output-directory-label" style="margin-top: 4px; color: #cbd5e1; font-size: 0.95rem;">Default Downloads folder</div>
+                        </div>
+                        <button class="btn btn-secondary" onclick="chooseOutputDirectory()">
+                            <span class="shadow"></span>
+                            <span class="edge"></span>
+                            <div class="front">
+                                <i class="fas fa-folder-open"></i>
+                                <span>Choose Folder</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
             
             <!-- Single Video Tab -->
             <div id="single-tab" class="tab-content active">
@@ -1215,7 +1239,10 @@
                         <i class="fas fa-file-audio"></i>
                         <select id="format" onchange="updateQualityOptions()">
                             <option value="mp3">MP3 (Audio Only)</option>
+                            <option value="flac">FLAC (Lossless Container)</option>
                             <option value="wav">WAV (Audio Only)</option>
+                            <option value="aac">AAC (Audio Only)</option>
+                            <option value="ogg">OGG Vorbis (Audio Only)</option>
                             <option value="mp4">MP4 (Video)</option>
                             <option value="webm">WebM (Video)</option>
                         </select>
@@ -1229,7 +1256,7 @@
                     </div>
                     <div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 0.9rem; color: #0369a1;">
                         <i class="fas fa-info-circle"></i>
-                        <strong>320kbps MP3:</strong> Apple Music equivalent quality with no perceptible compression artifacts. Perfect balance of quality and file size.
+                        <strong>FLAC note:</strong> Rustify creates FLAC with compression level 0 and no extra audio loss, but YouTube source audio is usually already lossy, so FLAC preserves the source cleanly rather than inventing new fidelity.
                     </div>
                 </div>
                 
@@ -1261,10 +1288,10 @@
             <!-- Playlist Tab -->
             <div id="playlist-tab" class="tab-content">
                 <div class="input-group">
-                    <label for="playlist-url">YouTube Playlist URL:</label>
+                    <label for="playlist-url">YouTube or Spotify Playlist URL:</label>
                     <div class="input-wrapper">
                         <i class="fas fa-list"></i>
-                        <input type="url" id="playlist-url" placeholder="https://www.youtube.com/playlist?list=..." />
+                        <input type="url" id="playlist-url" placeholder="https://www.youtube.com/playlist?list=... or https://open.spotify.com/playlist/..." />
                     </div>
                 </div>
                 
@@ -1274,7 +1301,10 @@
                         <i class="fas fa-file-audio"></i>
                         <select id="playlist-format" onchange="updatePlaylistQualityOptions()">
                             <option value="mp3">MP3 (Audio Only)</option>
+                            <option value="flac">FLAC (Lossless Container)</option>
                             <option value="wav">WAV (Audio Only)</option>
+                            <option value="aac">AAC (Audio Only)</option>
+                            <option value="ogg">OGG Vorbis (Audio Only)</option>
                             <option value="mp4">MP4 (Video)</option>
                             <option value="webm">WebM (Video)</option>
                         </select>
@@ -1288,7 +1318,7 @@
                     </div>
                     <div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 0.9rem; color: #0369a1;">
                         <i class="fas fa-info-circle"></i>
-                        <strong>Recommended:</strong> 320kbps for Apple Music quality across entire playlist. FLAC for audiophile collections.
+                        <strong>Recommended:</strong> 320kbps MP3 for compact listening, FLAC for archive copies without adding another lossy encode, WAV for fully uncompressed PCM output.
                     </div>
                 </div>
                 
@@ -1360,21 +1390,37 @@
         // Global variables
         let selectedQuality = '320';
         let selectedPlaylistQuality = '320';
+        let selectedOutputDirectory = null;
         let currentTasks = [];
         let wsConnection = null;
+        let tauriBridge = null;
         
         // Quality options for different formats
         const qualityOptions = {
             mp3: [
-                { value: '320', label: '320 kbps', description: 'Apple Music Compression Quality' },
+                { value: '320', label: '320 kbps', description: 'High quality MP3' },
                 { value: '256', label: '256 kbps', description: 'High Quality' },
                 { value: '192', label: '192 kbps', description: 'Standard Quality' },
                 { value: '128', label: '128 kbps', description: 'Basic Quality' },
                 { value: '96', label: '96 kbps', description: 'Low Quality' }
             ],
+            flac: [
+                { value: 'lossless', label: 'Lossless', description: 'FLAC level 0, source-limited fidelity' },
+                { value: 'archive', label: 'Archive', description: 'Best for keeping metadata-rich copies' }
+            ],
             wav: [
                 { value: 'lossless', label: 'Lossless', description: 'CD Quality (1411 kbps)' },
                 { value: 'hd', label: 'HD Audio', description: 'Hi-Res (2304 kbps)' }
+            ],
+            aac: [
+                { value: '256', label: '256 kbps', description: 'Apple-friendly high quality' },
+                { value: '192', label: '192 kbps', description: 'Balanced quality' },
+                { value: '128', label: '128 kbps', description: 'Compact files' }
+            ],
+            ogg: [
+                { value: '6', label: 'Q6', description: 'High quality Vorbis' },
+                { value: '5', label: 'Q5', description: 'Balanced quality' },
+                { value: '4', label: 'Q4', description: 'Smaller files' }
             ],
             mp4: [
                 { value: '1080p60', label: '1080p 60fps', description: 'Premium Quality' },
@@ -1398,8 +1444,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             updateQualityOptions();
             updatePlaylistQualityOptions();
-            connectWebSocket();
-            refreshTasks();
+            initializeRuntime();
             
             // Setup smooth video background
             const video = document.querySelector('.video-background video');
@@ -1457,6 +1502,83 @@
                 console.log('Video element not found');
             }
         });
+
+        async function initializeRuntime() {
+            if (isDesktopApp()) {
+                tauriBridge = window.__TAURI__;
+                document.getElementById('desktop-output-group').style.display = 'block';
+
+                try {
+                    const defaultDir = await tauriBridge.tauri.invoke('get_default_output_directory');
+                    setOutputDirectory(defaultDir, true);
+                    await tauriBridge.event.listen('task_update', event => {
+                        handleDesktopTaskUpdate(event.payload);
+                    });
+                } catch (error) {
+                    console.error('Failed to initialize desktop bridge:', error);
+                }
+            } else {
+                connectWebSocket();
+            }
+
+            refreshTasks();
+        }
+
+        function isDesktopApp() {
+            return Boolean(window.__TAURI__ && window.__TAURI__.tauri && window.__TAURI__.tauri.invoke);
+        }
+
+        function isPlaylistLikeUrl(url) {
+            const value = (url || '').toLowerCase();
+            return value.includes('playlist?list=') || value.includes('open.spotify.com/playlist/') || value.startsWith('spotify:playlist:');
+        }
+
+        function setOutputDirectory(path, isDefault = false) {
+            selectedOutputDirectory = path || null;
+            const label = document.getElementById('output-directory-label');
+            if (label) {
+                label.textContent = path || 'Default Downloads folder';
+            }
+
+            if (!isDefault && path) {
+                showStatus(`Desktop output folder set to ${path}`, 'success');
+            }
+        }
+
+        async function chooseOutputDirectory() {
+            if (!isDesktopApp()) {
+                showStatus('Browser downloads use your browser download folder.', 'info');
+                return;
+            }
+
+            try {
+                const path = await tauriBridge.tauri.invoke('select_output_directory');
+                if (path) {
+                    setOutputDirectory(path);
+                }
+            } catch (error) {
+                showStatus(`Could not select output folder: ${error}`, 'error');
+            }
+        }
+
+        function handleDesktopTaskUpdate(task) {
+            const existingIndex = currentTasks.findIndex(existingTask => existingTask.id === task.id);
+            if (existingIndex >= 0) {
+                currentTasks[existingIndex] = task;
+            } else {
+                currentTasks.push(task);
+            }
+
+            displayTasks(currentTasks);
+            const statusText = normalizeTaskStatus(task.status);
+            if (statusText === 'completed') {
+                hideProgress();
+                showStatus(`Saved locally: ${task.output_path}`, 'success');
+            } else if (statusText === 'failed') {
+                hideProgress();
+                showStatus(`Conversion failed: ${task.speed || 'Unknown error'}`, 'error');
+            }
+        }
         
         // Tab switching
         function switchTab(tabName) {
@@ -1496,7 +1618,7 @@
                 cardDiv.className = `e-card ${index === 0 ? 'playing' : ''}`;
                 cardDiv.onclick = () => selectQuality(option.value, 'single');
                 
-                const iconSvg = format === 'mp3' 
+                const iconSvg = ['mp3', 'flac', 'wav', 'aac', 'ogg'].includes(format)
                     ? `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="quality-icon">
                         <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                        </svg>`
@@ -1533,7 +1655,7 @@
                 cardDiv.className = `e-card ${index === 0 ? 'playing' : ''}`;
                 cardDiv.onclick = () => selectQuality(option.value, 'playlist');
                 
-                const iconSvg = format === 'mp3' 
+                const iconSvg = ['mp3', 'flac', 'wav', 'aac', 'ogg'].includes(format)
                     ? `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="quality-icon">
                         <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                        </svg>`
@@ -1673,6 +1795,16 @@
         // Download a file by task ID
         async function downloadFile(taskId) {
             try {
+                if (isDesktopApp()) {
+                    const task = currentTasks.find(item => item.id === taskId);
+                    if (task && task.output_path) {
+                        showStatus(`Saved locally: ${task.output_path}`, 'success');
+                    } else {
+                        showStatus('Desktop conversions are already stored locally.', 'info');
+                    }
+                    return;
+                }
+
                 const downloadUrl = `/api/download/${taskId}`;
                 
                 // Create a temporary link element and trigger download
@@ -1691,6 +1823,10 @@
         
         // API functions
         async function apiCall(endpoint, method = 'GET', data = null) {
+            if (isDesktopApp()) {
+                return tauriApiCall(endpoint, method, data);
+            }
+
             try {
                 const options = {
                     method,
@@ -1728,6 +1864,80 @@
                 throw error;
             }
         }
+
+        async function tauriApiCall(endpoint, method = 'GET', data = null) {
+            const invoke = tauriBridge.tauri.invoke;
+
+            if (endpoint === '/info' && method === 'POST') {
+                if (isPlaylistLikeUrl(data.url)) {
+                    const playlist = await invoke('get_playlist_info', { url: data.url });
+                    return {
+                        title: playlist.title,
+                        uploader: playlist.uploader,
+                        video_count: playlist.video_count
+                    };
+                }
+
+                const info = await invoke('get_video_info', { url: data.url });
+                return {
+                    title: info.title,
+                    duration: formatDurationSeconds(info.duration),
+                    thumbnail: info.thumbnails && info.thumbnails.length ? info.thumbnails[0].url : null,
+                    uploader: info.uploader,
+                    view_count: info.view_count
+                };
+            }
+
+            if (endpoint === '/convert' && method === 'POST') {
+                const id = await invoke('convert_video', {
+                    url: data.url,
+                    outputDir: selectedOutputDirectory,
+                    format: data.format,
+                    quality: data.quality
+                });
+                return { id };
+            }
+
+            if (endpoint === '/playlist' && method === 'POST') {
+                const id = await invoke('convert_playlist', {
+                    url: data.url,
+                    outputDir: selectedOutputDirectory,
+                    format: data.format,
+                    quality: data.quality
+                });
+                return { id };
+            }
+
+            if (endpoint === '/tasks' && method === 'GET') {
+                return invoke('get_conversion_progress');
+            }
+
+            if (endpoint.startsWith('/tasks/') && method === 'DELETE') {
+                const taskId = endpoint.split('/').pop();
+                await invoke('cancel_conversion', { taskId });
+                return { message: 'Task cancelled' };
+            }
+
+            if (endpoint === '/clear-completed' && method === 'POST') {
+                await invoke('clear_completed_tasks');
+                return { message: 'Completed tasks cleared' };
+            }
+
+            throw new Error(`Unsupported desktop API call: ${method} ${endpoint}`);
+        }
+
+        function formatDurationSeconds(totalSeconds) {
+            const seconds = Number(totalSeconds || 0);
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+
+            if (hours > 0) {
+                return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }
+
+            return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
         
         async function getVideoInfo() {
             const url = document.getElementById('url').value.trim();
@@ -1749,7 +1959,7 @@
         async function getPlaylistInfo() {
             const url = document.getElementById('playlist-url').value.trim();
             if (!url) {
-                showStatus('Please enter a YouTube playlist URL', 'error');
+                showStatus('Please enter a YouTube or Spotify playlist URL', 'error');
                 return;
             }
             
@@ -1778,7 +1988,8 @@
                 const result = await apiCall('/convert', 'POST', {
                     url,
                     format,
-                    quality: selectedQuality
+                    quality: selectedQuality,
+                    output_path: selectedOutputDirectory
                 });
                 
                 console.log('Conversion result:', result); // Debug log
@@ -1786,8 +1997,9 @@
                 if (result && result.id) {
                     showStatus(`Conversion started! Task ID: ${result.id}`, 'success');
                     
-                    // Start monitoring the task
-                    monitorTask(result.id);
+                    if (!isDesktopApp()) {
+                        monitorTask(result.id);
+                    }
                 } else {
                     hideProgress();
                     showStatus('Error: Invalid response from server', 'error');
@@ -1804,7 +2016,7 @@
             const format = document.getElementById('playlist-format').value;
             
             if (!url) {
-                showStatus('Please enter a YouTube playlist URL', 'error');
+                showStatus('Please enter a YouTube or Spotify playlist URL', 'error');
                 return;
             }
             
@@ -1815,7 +2027,8 @@
                 const result = await apiCall('/playlist', 'POST', {
                     url,
                     format,
-                    quality: selectedPlaylistQuality
+                    quality: selectedPlaylistQuality,
+                    output_path: selectedOutputDirectory
                 });
                 
                 console.log('Playlist conversion result:', result);
@@ -1823,15 +2036,19 @@
                 if (result && result.id) {
                     // Single task response from our actual API
                     showStatus(`Playlist conversion started! Task ID: ${result.id}`, 'success');
-                    monitorTask(result.id);
+                    if (!isDesktopApp()) {
+                        monitorTask(result.id);
+                    }
                 } else if (result && Array.isArray(result) && result.length > 0) {
                     // Multiple tasks (legacy support)
                     showStatus(`Playlist conversion started! ${result.length} tasks created.`, 'success');
-                    result.forEach(task => {
-                        if (task.id) {
-                            monitorTask(task.id);
-                        }
-                    });
+                    if (!isDesktopApp()) {
+                        result.forEach(task => {
+                            if (task.id) {
+                                monitorTask(task.id);
+                            }
+                        });
+                    }
                 } else {
                     hideProgress();
                     showStatus('Unexpected response format from server', 'error');
@@ -1846,6 +2063,7 @@
         async function refreshTasks() {
             try {
                 const tasks = await apiCall('/tasks');
+                currentTasks = Array.isArray(tasks) ? tasks : [];
                 displayTasks(tasks);
             } catch (error) {
                 showStatus(`Error loading tasks: ${error.message}`, 'error');
@@ -1863,8 +2081,14 @@
         }
         
         function clearCompletedTasks() {
-            // This would need to be implemented in the backend
-            showStatus('Clear completed tasks feature coming soon!', 'info');
+            apiCall('/clear-completed', 'POST')
+                .then(() => {
+                    showStatus('Completed tasks cleared.', 'success');
+                    refreshTasks();
+                })
+                .catch(error => {
+                    showStatus(`Error clearing tasks: ${error.message}`, 'error');
+                });
         }
         
         // UI functions
@@ -1881,6 +2105,32 @@
             `;
             container.style.display = 'block';
         }
+
+        function normalizeTaskStatus(status) {
+            if (typeof status === 'string') {
+                return status.toLowerCase();
+            }
+
+            if (status && typeof status === 'object') {
+                const key = Object.keys(status)[0];
+                return key ? key.toLowerCase() : 'unknown';
+            }
+
+            return 'unknown';
+        }
+
+        function taskFailureMessage(status) {
+            if (typeof status === 'string') {
+                return status;
+            }
+
+            if (status && typeof status === 'object') {
+                const key = Object.keys(status)[0];
+                return key && status[key] ? `${key}: ${status[key]}` : key || 'Failed';
+            }
+
+            return 'Failed';
+        }
         
         function displayTasks(tasks) {
             const container = document.getElementById('tasks-container');
@@ -1895,24 +2145,30 @@
                 const taskElement = document.createElement('div');
                 taskElement.className = 'task-item';
                 
-                const statusClass = task.status.toLowerCase().includes('completed') ? 'completed' : 
-                                   task.status.toLowerCase().includes('processing') ? 'processing' : 
-                                   task.status.toLowerCase().includes('failed') ? 'failed' : 'processing';
-                const statusText = task.status === 'processing' ? 'In Progress' : 
-                                  task.status === 'completed' ? 'Completed' : 
-                                  task.status.charAt(0).toUpperCase() + task.status.slice(1);
+                const normalizedStatus = normalizeTaskStatus(task.status);
+                const statusClass = normalizedStatus.includes('completed') ? 'completed' :
+                                   normalizedStatus.includes('processing') || normalizedStatus.includes('converting') || normalizedStatus.includes('pending') ? 'processing' :
+                                   normalizedStatus.includes('failed') || normalizedStatus.includes('cancelled') ? 'failed' : 'processing';
+                const statusText = normalizedStatus === 'processing' || normalizedStatus === 'converting'
+                    ? 'In Progress'
+                    : normalizedStatus === 'completed'
+                        ? 'Completed'
+                        : normalizedStatus === 'cancelled'
+                            ? 'Cancelled'
+                            : taskFailureMessage(task.status);
                 
                 taskElement.innerHTML = `
                     <div class="task-info">
                         <h4>${task.title || task.url}</h4>
                         <p>Format: ${task.format.toUpperCase()} | Quality: ${task.quality}</p>
                         <p>Created: ${new Date(task.created_at).toLocaleString()}</p>
+                        ${task.output_path ? `<p>Output: ${task.output_path}</p>` : ''}
                         ${task.progress > 0 && task.progress < 100 ? `<p>Progress: ${Math.round(task.progress)}%</p>` : ''}
                     </div>
                     <div>
                         <span class="task-status ${statusClass}">${statusText}</span>
-                        ${task.status === 'processing' ? `<button class="btn btn-secondary" style="margin-left: 10px;" onclick="cancelTask('${task.id}')"><i class="fas fa-times"></i> Cancel</button>` : ''}
-                        ${task.status === 'completed' ? `<button class="btn btn-success" style="margin-left: 10px;" onclick="downloadFile('${task.id}')"><i class="fas fa-download"></i> Download</button>` : ''}
+                        ${(normalizedStatus === 'processing' || normalizedStatus === 'converting') ? `<button class="btn btn-secondary" style="margin-left: 10px;" onclick="cancelTask('${task.id}')"><i class="fas fa-times"></i> Cancel</button>` : ''}
+                        ${normalizedStatus === 'completed' ? `<button class="btn btn-success" style="margin-left: 10px;" onclick="downloadFile('${task.id}')"><i class="fas fa-download"></i> ${isDesktopApp() ? 'Locate' : 'Download'}</button>` : ''}
                     </div>
                 `;
                 

@@ -13,12 +13,15 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_video_info,
+            get_playlist_info,
             get_quality_options,
             convert_video,
             convert_playlist,
             get_conversion_progress,
             cancel_conversion,
+            clear_completed_tasks,
             select_output_directory,
+            get_default_output_directory,
             validate_youtube_url
         ])
         .setup(|app| {

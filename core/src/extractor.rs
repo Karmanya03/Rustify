@@ -1,6 +1,8 @@
-use anyhow::Result;
+use crate::{runtime, AppConfig};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use serde_json::Value;
+use tracing::info;
 
 /// YouTube video information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +17,7 @@ pub struct VideoInfo {
     pub thumbnails: Vec<Thumbnail>,
 }
 
-/// Video/Audio format information
+/// Video/audio format information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormatInfo {
     pub format_id: String,
@@ -27,8 +29,8 @@ pub struct FormatInfo {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub fps: Option<f32>,
-    pub abr: Option<f32>, // Audio bitrate
-    pub vbr: Option<f32>, // Video bitrate
+    pub abr: Option<f32>,
+    pub vbr: Option<f32>,
     pub filesize: Option<u64>,
     pub quality: i32,
 }
@@ -61,178 +63,229 @@ pub struct PlaylistVideo {
     pub uploader: String,
 }
 
-/// YouTube extractor
+/// Shared yt-dlp backed extractor used by every interface.
 pub struct YouTubeExtractor {
-    #[allow(dead_code)]
-    client: reqwest::Client,
+    config: AppConfig,
 }
 
 impl YouTubeExtractor {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(config: AppConfig) -> Self {
+        Self { config }
     }
-}
 
-impl Default for YouTubeExtractor {
-    fn default() -> Self {
-        Self {
-            client: reqwest::Client::builder()
-                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .build()
-                .expect("Failed to create HTTP client"),
-        }
-    }
-}
-
-impl YouTubeExtractor {
-    /// Extract video information from URL
+    /// Extract video information from a URL.
     pub async fn extract_info(&self, url: &str) -> Result<VideoInfo> {
         info!("Extracting video info for: {}", url);
-        
-        // For now, return dummy data with realistic titles
-        // In real implementation, this would use youtube_dl crate or external yt-dlp
-        warn!("Using placeholder video info - would use yt-dlp in real implementation");
-        
-        // Extract video ID from URL for more realistic titles
-        let video_id = self.extract_video_id(url).unwrap_or_else(|_| "unknown".to_string());
-        let realistic_title = match video_id.as_str() {
-            "dQw4w9WgXcQ" => "Rick Astley - Never Gonna Give You Up (Official Video)",
-            "9bZkp7q19f0" => "PSY - GANGNAM STYLE(강남스타일) M/V",
-            "MHsI8hJmggI" => "Sample Music Video - High Quality Audio Test",
-            "kJQP7kiw5Fk" => "Luis Fonsi - Despacito ft. Daddy Yankee",
-            "fJ9rUzIMcZQ" => "Queen - Bohemian Rhapsody (Official Video)",
-            "hTWKbfoikeg" => "Nirvana - Smells Like Teen Spirit (Official Music Video)",
-            _ => "Sample YouTube Video - Test Audio"
-        };
-        
-        Ok(VideoInfo {
-            id: video_id,
-            title: realistic_title.to_string(),
-            duration: 180, // 3 minutes
-            uploader: "Test Channel".to_string(),
-            upload_date: "2024-01-01".to_string(),
-            view_count: Some(1000000),
-            formats: vec![
-                FormatInfo {
-                    format_id: "22".to_string(),
-                    url: url.to_string(),
-                    ext: "mp4".to_string(),
-                    format_note: Some("720p".to_string()),
-                    acodec: Some("aac".to_string()),
-                    vcodec: Some("avc1".to_string()),
-                    width: Some(1280),
-                    height: Some(720),
-                    fps: Some(30.0),
-                    abr: Some(128.0),
-                    vbr: Some(1000.0),
-                    filesize: Some(50_000_000),
-                    quality: 720,
-                },
-                FormatInfo {
-                    format_id: "140".to_string(),
-                    url: url.to_string(),
-                    ext: "m4a".to_string(),
-                    format_note: Some("audio only".to_string()),
-                    acodec: Some("aac".to_string()),
-                    vcodec: None,
-                    width: None,
-                    height: None,
-                    fps: None,
-                    abr: Some(128.0),
-                    vbr: None,
-                    filesize: Some(5_000_000),
-                    quality: 0,
-                },
-            ],
-            thumbnails: vec![
-                Thumbnail {
-                    url: "https://example.com/thumb.jpg".to_string(),
-                    width: Some(1280),
-                    height: Some(720),
-                },
-            ],
-        })
+
+        let args = vec![
+            "--dump-single-json".to_string(),
+            "--no-warnings".to_string(),
+            "--no-playlist".to_string(),
+            url.to_string(),
+        ];
+        let output = runtime::run_ytdlp_capture(&self.config, &args).await?;
+        let value: Value = serde_json::from_str(output.stdout.trim())
+            .map_err(|error| anyhow!("Failed to parse yt-dlp JSON: {error}"))?;
+
+        parse_video_info(&value, url)
     }
 
-    /// Extract playlist information
+    /// Extract playlist information.
     pub async fn extract_playlist_info(&self, url: &str) -> Result<PlaylistInfo> {
         info!("Extracting playlist info for: {}", url);
-        
-        // Placeholder implementation
-        warn!("Using placeholder playlist info - would use yt-dlp in real implementation");
-        
+
+        if crate::spotify::is_valid_spotify_playlist_url(url) {
+            let playlist = crate::spotify::resolve_playlist(&self.config, url).await?;
+            let videos = playlist
+                .tracks
+                .iter()
+                .map(|track| PlaylistVideo {
+                    id: track.id.clone(),
+                    title: track.display_title(),
+                    url: track.search_query(&self.config),
+                    duration: track.duration_ms.map(|value| value / 1_000),
+                    uploader: if track.artists.is_empty() {
+                        playlist.owner.clone()
+                    } else {
+                        track.artists.join(", ")
+                    },
+                })
+                .collect::<Vec<_>>();
+
+            return Ok(PlaylistInfo {
+                id: playlist.id,
+                title: playlist.title,
+                uploader: playlist.owner,
+                video_count: playlist.total_tracks.max(videos.len()),
+                videos,
+            });
+        }
+
+        let args = vec![
+            "--dump-single-json".to_string(),
+            "--flat-playlist".to_string(),
+            "--yes-playlist".to_string(),
+            "--no-warnings".to_string(),
+            url.to_string(),
+        ];
+        let output = runtime::run_ytdlp_capture(&self.config, &args).await?;
+        let value: Value = serde_json::from_str(output.stdout.trim())
+            .map_err(|error| anyhow!("Failed to parse playlist JSON: {error}"))?;
+
+        let entries = value["entries"].as_array().cloned().unwrap_or_default();
+        let videos = entries
+            .iter()
+            .filter_map(|entry| {
+                let id = entry["id"].as_str()?.to_string();
+                let video_url = entry["url"]
+                    .as_str()
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={id}"));
+
+                Some(PlaylistVideo {
+                    id,
+                    title: entry["title"].as_str().unwrap_or("Untitled").to_string(),
+                    url: video_url,
+                    duration: entry["duration"]
+                        .as_u64()
+                        .or_else(|| entry["duration"].as_f64().map(|value| value as u64)),
+                    uploader: entry["uploader"].as_str().unwrap_or("").to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         Ok(PlaylistInfo {
-            id: "dummy_playlist_id".to_string(),
-            title: format!("Test Playlist from {}", url),
-            uploader: "Test Channel".to_string(),
-            video_count: 5,
-            videos: vec![
-                PlaylistVideo {
-                    id: "video1".to_string(),
-                    title: "Test Video 1".to_string(),
-                    url: url.to_string(),
-                    duration: Some(180),
-                    uploader: "Test Channel".to_string(),
-                },
-                PlaylistVideo {
-                    id: "video2".to_string(),
-                    title: "Test Video 2".to_string(),
-                    url: url.to_string(),
-                    duration: Some(240),
-                    uploader: "Test Channel".to_string(),
-                },
-            ],
+            id: value["id"].as_str().unwrap_or("").to_string(),
+            title: value["title"].as_str().unwrap_or("Playlist").to_string(),
+            uploader: value["uploader"].as_str().unwrap_or("").to_string(),
+            video_count: videos.len(),
+            videos,
         })
     }
 
-    /// Get best format for quality and type
-    pub fn get_best_format<'a>(&self, video_info: &'a VideoInfo, format_type: &str, quality: &str) -> Option<&'a FormatInfo> {
+    /// Get the best source format for audio or video.
+    pub fn get_best_format<'a>(
+        &self,
+        video_info: &'a VideoInfo,
+        format_type: &str,
+        quality: &str,
+    ) -> Option<&'a FormatInfo> {
         match format_type {
-            "audio" => {
-                // Return audio-only format
-                video_info.formats.iter()
-                    .filter(|f| f.vcodec.is_none() && f.acodec.is_some())
-                    .max_by_key(|f| f.abr.unwrap_or(0.0) as u32)
-            }
+            "audio" => video_info
+                .formats
+                .iter()
+                .filter(|format| {
+                    format.vcodec.is_none()
+                        && format.acodec.is_some()
+                        && format.acodec.as_deref() != Some("none")
+                })
+                .max_by_key(|format| format.abr.unwrap_or(0.0) as u32),
             "video" => {
-                // Return video format based on quality
                 let target_height = match quality {
                     "144p" => 144,
                     "240p" => 240,
                     "360p" => 360,
                     "480p" => 480,
                     "720p" => 720,
-                    "1080p" => 1080,
+                    "1080p" | "1080p60" => 1080,
                     "1440p" => 1440,
-                    "2160p" => 2160,
-                    _ => 720, // default
+                    "2160p" | "4k" | "4K" => 2160,
+                    _ => 1080,
                 };
 
-                video_info.formats.iter()
-                    .filter(|f| f.vcodec.is_some() && f.height.is_some())
-                    .min_by_key(|f| (f.height.unwrap() as i32 - target_height).abs())
+                video_info
+                    .formats
+                    .iter()
+                    .filter(|format| {
+                        format.vcodec.is_some()
+                            && format.vcodec.as_deref() != Some("none")
+                            && format.height.is_some()
+                    })
+                    .min_by_key(|format| (format.height.unwrap() as i32 - target_height).abs())
             }
             _ => video_info.formats.first(),
         }
     }
 
-    /// Extract video ID from URL
+    /// Extract a YouTube video ID from a URL.
     pub fn extract_video_id(&self, url: &str) -> Result<String> {
-        // Simple implementation - would be more robust in real app
-        if url.contains("youtube.com/watch") {
-            if let Some(start) = url.find("v=") {
-                let id_start = start + 2;
-                let id_end = url[id_start..].find('&').unwrap_or(url[id_start..].len());
-                return Ok(url[id_start..id_start + id_end].to_string());
-            }
-        } else if url.contains("youtu.be/") {
-            if let Some(start) = url.find("youtu.be/") {
-                let id_start = start + 9;
-                let id_end = url[id_start..].find('?').unwrap_or(url[id_start..].len());
-                return Ok(url[id_start..id_start + id_end].to_string());
-            }
-        }
-        
-        anyhow::bail!("Could not extract video ID from URL: {}", url);
+        crate::utils::extract_video_id(url)
+            .ok_or_else(|| anyhow!("Could not extract video ID from URL: {url}"))
+    }
+}
+
+fn parse_video_info(value: &Value, fallback_url: &str) -> Result<VideoInfo> {
+    let id = value["id"]
+        .as_str()
+        .map(str::to_string)
+        .or_else(|| crate::utils::extract_video_id(fallback_url))
+        .unwrap_or_default();
+
+    let formats = value["formats"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(parse_format_info)
+        .collect::<Vec<_>>();
+
+    let thumbnails = value["thumbnails"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|thumbnail| {
+            Some(Thumbnail {
+                url: thumbnail["url"].as_str()?.to_string(),
+                width: thumbnail["width"].as_u64().map(|width| width as u32),
+                height: thumbnail["height"].as_u64().map(|height| height as u32),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(VideoInfo {
+        id,
+        title: value["title"].as_str().unwrap_or("Untitled").to_string(),
+        duration: value["duration"]
+            .as_u64()
+            .or_else(|| value["duration"].as_f64().map(|seconds| seconds as u64))
+            .unwrap_or_default(),
+        uploader: value["uploader"].as_str().unwrap_or("").to_string(),
+        upload_date: value["upload_date"].as_str().unwrap_or("").to_string(),
+        view_count: value["view_count"].as_u64(),
+        formats,
+        thumbnails,
+    })
+}
+
+fn parse_format_info(format: Value) -> FormatInfo {
+    let acodec = format["acodec"].as_str().map(str::to_string);
+    let vcodec = format["vcodec"].as_str().map(str::to_string);
+
+    FormatInfo {
+        format_id: format["format_id"].as_str().unwrap_or("").to_string(),
+        url: format["url"].as_str().unwrap_or("").to_string(),
+        ext: format["ext"].as_str().unwrap_or("").to_string(),
+        format_note: format["format_note"]
+            .as_str()
+            .or_else(|| format["format"].as_str())
+            .map(str::to_string),
+        acodec: acodec.filter(|value| value != "none"),
+        vcodec: vcodec.filter(|value| value != "none"),
+        width: format["width"].as_u64().map(|width| width as u32),
+        height: format["height"].as_u64().map(|height| height as u32),
+        fps: format["fps"].as_f64().map(|fps| fps as f32),
+        abr: format["abr"].as_f64().map(|abr| abr as f32),
+        vbr: format["vbr"]
+            .as_f64()
+            .or_else(|| format["tbr"].as_f64())
+            .map(|vbr| vbr as f32),
+        filesize: format["filesize"]
+            .as_u64()
+            .or_else(|| format["filesize_approx"].as_u64()),
+        quality: format["height"]
+            .as_i64()
+            .or_else(|| format["quality"].as_i64())
+            .unwrap_or_default() as i32,
     }
 }

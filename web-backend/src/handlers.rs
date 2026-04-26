@@ -1,17 +1,22 @@
-﻿use axum::{
+use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
+use rustify_core::{
+    format_duration, is_supported_playlist_url, is_valid_spotify_playlist_url,
+    is_valid_youtube_url, sanitize_filename, ConversionProgress, OutputFormat,
+    QualityOptions as CoreQualityOptions,
+};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use tracing::info;
+use std::sync::Arc;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
+use tracing::info;
+use uuid::Uuid;
 
 use crate::state::{AppState, TaskResponse, TaskStatus, TaskUpdate};
-use crate::youtube::ConversionOptions;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VideoInfoRequest {
@@ -23,7 +28,6 @@ pub struct ConversionRequest {
     pub url: String,
     pub format: String,
     pub quality: String,
-    pub output_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,7 +35,6 @@ pub struct PlaylistRequest {
     pub url: String,
     pub format: String,
     pub quality: String,
-    pub output_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,271 +47,190 @@ pub struct VideoInfo {
     pub title: String,
     pub duration: Option<String>,
     pub thumbnail: Option<String>,
-    pub channel: Option<String>,
+    pub uploader: Option<String>,
+    pub view_count: Option<u64>,
+    pub video_count: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QualityOptions {
-    pub formats: Vec<FormatOption>,
+    pub audio: Vec<FormatOption>,
+    pub video: Vec<FormatOption>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormatOption {
-    pub format_id: String,
-    pub format: String,
-    pub quality: String,
+    pub label: String,
+    pub codec: String,
+    pub detail: String,
     pub filesize: Option<u64>,
 }
 
-// Health check endpoint
 pub async fn health_check() -> impl IntoResponse {
     Json(serde_json::json!({
         "status": "healthy",
         "service": "rustify-web-backend",
-        "version": "0.1.0"
+        "version": "0.2.0"
     }))
 }
 
-// Dependency check endpoint
-pub async fn dependency_check() -> impl IntoResponse {
-    match crate::youtube::check_dependencies().await {
-        Ok(()) => {
-            Json(serde_json::json!({
-                "status": "ok",
-                "yt_dlp": "available",
-                "ffmpeg": "available",
-                "message": "All dependencies are available"
-            }))
-        }
-        Err(e) => {
-            Json(serde_json::json!({
-                "status": "partial",
-                "yt_dlp": if e.to_string().contains("yt-dlp not found") { "missing" } else { "available" },
-                "ffmpeg": "optional",
-                "message": format!("Some dependencies missing: {}", e)
-            }))
-        }
-    }
+pub async fn dependency_check(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.rustify.dependency_status().await)
 }
 
-// Get video information
 pub async fn get_video_info(
+    State(state): State<AppState>,
     Json(request): Json<VideoInfoRequest>,
 ) -> Result<Json<VideoInfo>, Response> {
-    info!("Getting video info for URL: {}", request.url);
-    
-    // Check if it's a playlist URL
-    if request.url.contains("playlist?list=") {
-        match crate::youtube::get_playlist_info(&request.url).await {
-            Ok(playlist_info) => {
-                return Ok(Json(VideoInfo {
-                    title: format!("{} (Playlist - {} videos)", playlist_info.title, playlist_info.video_count),
-                    duration: Some(format!("{} videos", playlist_info.video_count)),
-                    thumbnail: None,
-                    channel: playlist_info.uploader,
-                }));
-            }
-            Err(e) => {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse {
-                        error: format!("Failed to get playlist info: {}", e),
-                    }),
-                ).into_response());
-            }
-        }
+    ensure_info_url(&request.url)?;
+
+    if is_playlist_url(&request.url) {
+        let playlist = state
+            .rustify
+            .get_playlist_info(&request.url)
+            .await
+            .map_err(bad_request)?;
+        return Ok(Json(VideoInfo {
+            title: playlist.title,
+            duration: None,
+            thumbnail: None,
+            uploader: Some(playlist.uploader),
+            view_count: None,
+            video_count: Some(playlist.video_count),
+        }));
     }
-    
-    // Single video
-    match crate::youtube::get_video_info(&request.url).await {
-        Ok(video_info) => {
-            Ok(Json(VideoInfo {
-                title: video_info.title,
-                duration: video_info.duration,
-                thumbnail: video_info.thumbnail,
-                channel: video_info.channel,
-            }))
-        }
-        Err(e) => {
-            Err((
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: format!("Failed to get video info: {}", e),
-                }),
-            ).into_response())
-        }
-    }
+
+    let info = state
+        .rustify
+        .get_video_info(&request.url)
+        .await
+        .map_err(bad_request)?;
+
+    Ok(Json(VideoInfo {
+        title: info.title,
+        duration: Some(format_duration(info.duration)),
+        thumbnail: info.thumbnails.first().map(|thumbnail| thumbnail.url.clone()),
+        uploader: Some(info.uploader),
+        view_count: info.view_count,
+        video_count: None,
+    }))
 }
 
-// Get quality options for a video
 pub async fn get_quality_options(
+    State(state): State<AppState>,
     Json(request): Json<VideoInfoRequest>,
 ) -> Result<Json<QualityOptions>, Response> {
-    match crate::youtube::get_formats(&request.url).await {
-        Ok(formats) => {
-            let format_options: Vec<FormatOption> = formats.into_iter().map(|f| FormatOption {
-                format_id: f.format_id,
-                format: f.ext,
-                quality: f.resolution.unwrap_or_else(|| "unknown".to_string()),
-                filesize: f.filesize,
-            }).collect();
-            
-            Ok(Json(QualityOptions {
-                formats: format_options,
-            }))
-        }
-        Err(_) => {
-            // Fallback to default options
-            Ok(Json(QualityOptions {
-                formats: vec![
-                    FormatOption {
-                        format_id: "mp4_720p".to_string(),
-                        format: "mp4".to_string(),
-                        quality: "720p".to_string(),
-                        filesize: Some(100_000_000),
-                    },
-                    FormatOption {
-                        format_id: "mp4_1080p".to_string(),
-                        format: "mp4".to_string(),
-                        quality: "1080p".to_string(),
-                        filesize: Some(200_000_000),
-                    },
-                ],
-            }))
-        }
-    }
+    ensure_youtube_url(&request.url)?;
+    let qualities = state
+        .rustify
+        .get_available_qualities(&request.url)
+        .await
+        .map_err(bad_request)?;
+
+    Ok(Json(map_quality_options(&qualities)))
 }
 
-// Start video conversion
 pub async fn start_conversion(
     State(state): State<AppState>,
     Json(request): Json<ConversionRequest>,
 ) -> Result<Json<TaskResponse>, Response> {
+    ensure_youtube_url(&request.url)?;
+
     let task_id = Uuid::new_v4().to_string();
-    
+    let video_info = state
+        .rustify
+        .get_video_info(&request.url)
+        .await
+        .map_err(bad_request)?;
+    let output_format = parse_output_format(&request.format, &request.quality)
+        .map_err(|error| bad_request(anyhow::anyhow!(error)))?;
+    let output_dir = state.downloads_dir.join(&task_id);
+    let output_path = output_dir.join(format!(
+        "{}.{}",
+        sanitize_filename(&video_info.title),
+        extension_for_format(&output_format)
+    ));
+
     let task = TaskResponse {
         id: task_id.clone(),
+        title: Some(video_info.title.clone()),
         url: request.url.clone(),
         format: request.format.clone(),
         quality: request.quality.clone(),
         status: "pending".to_string(),
         progress: 0.0,
         created_at: chrono::Utc::now(),
-        output_path: None,
+        output_path: Some(output_dir.to_string_lossy().to_string()),
         file_path: None,
         playlist_files: None,
     };
 
-    // Store task
     {
         let mut tasks = state.tasks.lock().await;
         tasks.insert(task_id.clone(), task.clone());
     }
+    let _ = state.task_updates.send(TaskUpdate {
+        task_id: task_id.clone(),
+        status: TaskStatus::Pending,
+        progress: 0.0,
+        speed: "Queued".to_string(),
+        eta: "Starting".to_string(),
+    });
 
-    // Start conversion in background
     let state_clone = state.clone();
-    let task_id_clone = task_id.clone();
     let request_clone = request.clone();
-    
     tokio::spawn(async move {
-        let conversion_options = ConversionOptions {
-            url: request_clone.url,
-            format: request_clone.format,
-            quality: request_clone.quality,
-            output_dir: format!("{}/{}", state_clone.downloads_dir, task_id_clone),
-        };
+        update_task(&state_clone, &task_id, |task| {
+            task.status = "processing".to_string();
+            task.progress = 1.0;
+        })
+        .await;
 
-        // Update task status to converting
-        {
-            let mut tasks = state_clone.tasks.lock().await;
-            if let Some(task) = tasks.get_mut(&task_id_clone) {
-                task.status = "processing".to_string();
-                task.progress = 10.0;
-            }
-        }
-
-        // Broadcast update
-        let _ = state_clone.task_updates.send(TaskUpdate {
-            task_id: task_id_clone.clone(),
-            status: TaskStatus::Converting,
-            progress: 10.0,
-            speed: "Starting download...".to_string(),
-            eta: "Calculating...".to_string(),
-        });
-
-        // Simulate progress updates during download
-        let state_clone_progress = state_clone.clone();
-        let task_id_progress = task_id_clone.clone();
-        
-        // Start a progress simulation task
-        let progress_task = tokio::spawn(async move {
-            for i in 1..=8 {
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let progress = 10.0 + (i as f64 * 10.0); // 20%, 30%, 40%, etc.
-                
+        let rustify = Arc::clone(&state_clone.rustify);
+        let result: anyhow::Result<()> = rustify
+            .convert_video(
+                &request_clone.url,
+                output_path.clone(),
+                output_format,
+                &request_clone.quality,
                 {
-                    let mut tasks = state_clone_progress.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_progress) {
-                        if task.status == "processing" {
-                            task.progress = progress;
-                        } else {
-                            break; // Task completed or failed
-                        }
+                    let state = state_clone.clone();
+                    let task_id = task_id.clone();
+                    move |progress| {
+                        let state = state.clone();
+                        let task_id = task_id.clone();
+                        tokio::spawn(async move {
+                            apply_progress_update(&state, &task_id, &progress).await;
+                        });
                     }
-                }
+                },
+            )
+            .await;
 
-                let _ = state_clone_progress.task_updates.send(TaskUpdate {
-                    task_id: task_id_progress.clone(),
-                    status: TaskStatus::Converting,
-                    progress,
-                    speed: format!("Downloading... {}%", progress as i32),
-                    eta: format!("{}s remaining", 20 - (i * 2)),
-                });
-            }
-        });
-
-        // Perform actual download
-        match crate::youtube::download_video(conversion_options).await {
-            Ok(file_path) => {
-                // Cancel progress simulation
-                progress_task.abort();
-                
-                // Update task as completed
-                {
-                    let mut tasks = state_clone.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_clone) {
-                        task.status = "completed".to_string();
-                        task.progress = 100.0;
-                        task.file_path = Some(file_path.clone());
-                    }
-                }
-
-                // Broadcast completion
+        match result {
+            Ok(()) => {
+                update_task(&state_clone, &task_id, |task| {
+                    task.status = "completed".to_string();
+                    task.progress = 100.0;
+                    task.file_path = Some(output_path.to_string_lossy().to_string());
+                })
+                .await;
                 let _ = state_clone.task_updates.send(TaskUpdate {
-                    task_id: task_id_clone,
+                    task_id,
                     status: TaskStatus::Completed,
                     progress: 100.0,
                     speed: "Complete".to_string(),
                     eta: "Done".to_string(),
                 });
             }
-            Err(e) => {
-                // Cancel progress simulation
-                progress_task.abort();
-                
-                // Update task as failed
-                {
-                    let mut tasks = state_clone.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_clone) {
-                        task.status = format!("failed: {}", e);
-                        task.progress = 0.0;
-                    }
-                }
-
-                // Broadcast failure
+            Err(error) => {
+                update_task(&state_clone, &task_id, |task| {
+                    task.status = format!("failed: {}", error);
+                })
+                .await;
                 let _ = state_clone.task_updates.send(TaskUpdate {
-                    task_id: task_id_clone,
-                    status: TaskStatus::Failed(e.to_string()),
+                    task_id,
+                    status: TaskStatus::Failed(error.to_string()),
                     progress: 0.0,
                     speed: "Failed".to_string(),
                     eta: "Error".to_string(),
@@ -316,230 +238,144 @@ pub async fn start_conversion(
             }
         }
     });
-    
+
     Ok(Json(task))
 }
 
-// Convert playlist
 pub async fn convert_playlist(
     State(state): State<AppState>,
     Json(request): Json<PlaylistRequest>,
 ) -> Result<Json<TaskResponse>, Response> {
+    ensure_playlist_url(&request.url)?;
+
     let task_id = Uuid::new_v4().to_string();
-    
+    let playlist_info = state
+        .rustify
+        .get_playlist_info(&request.url)
+        .await
+        .map_err(bad_request)?;
+    let output_format = parse_output_format(&request.format, &request.quality)
+        .map_err(|error| bad_request(anyhow::anyhow!(error)))?;
+    let output_dir = state.downloads_dir.join(format!("playlist-{task_id}"));
+
     let task = TaskResponse {
         id: task_id.clone(),
+        title: Some(playlist_info.title.clone()),
         url: request.url.clone(),
         format: request.format.clone(),
         quality: request.quality.clone(),
         status: "pending".to_string(),
         progress: 0.0,
         created_at: chrono::Utc::now(),
-        output_path: None,
+        output_path: Some(output_dir.to_string_lossy().to_string()),
         file_path: None,
         playlist_files: None,
     };
 
-    // Store task
     {
         let mut tasks = state.tasks.lock().await;
         tasks.insert(task_id.clone(), task.clone());
     }
+    let _ = state.task_updates.send(TaskUpdate {
+        task_id: task_id.clone(),
+        status: TaskStatus::Pending,
+        progress: 0.0,
+        speed: "Queued".to_string(),
+        eta: "Starting".to_string(),
+    });
 
-    // Start playlist conversion in background
     let state_clone = state.clone();
-    let task_id_clone = task_id.clone();
     let request_clone = request.clone();
-    
+    let total_videos = playlist_info.video_count.max(1) as f64;
     tokio::spawn(async move {
-        let playlist_dir = format!("{}/playlist_{}", state_clone.downloads_dir, task_id_clone);
-        let conversion_options = ConversionOptions {
-            url: request_clone.url.clone(),
-            format: request_clone.format.clone(),
-            quality: request_clone.quality.clone(),
-            output_dir: playlist_dir.clone(),
-        };
+        update_task(&state_clone, &task_id, |task| {
+            task.status = "processing".to_string();
+            task.progress = 1.0;
+        })
+        .await;
 
-        // Update task status to processing
-        {
-            let mut tasks = state_clone.tasks.lock().await;
-            if let Some(task) = tasks.get_mut(&task_id_clone) {
-                task.status = "processing".to_string();
-                task.progress = 5.0;
-                task.output_path = Some(playlist_dir.clone());
-            }
-        }
-
-        // Broadcast initial update
-        let _ = state_clone.task_updates.send(TaskUpdate {
-            task_id: task_id_clone.clone(),
-            status: TaskStatus::Converting,
-            progress: 5.0,
-            speed: "Analyzing playlist...".to_string(),
-            eta: "Calculating...".to_string(),
-        });
-
-        // Start enhanced progress tracking
-        let state_clone_progress = state_clone.clone();
-        let task_id_progress = task_id_clone.clone();
-        
-        let progress_task = tokio::spawn(async move {
-            let mut current_progress: f64;
-            let mut iteration = 0;
-            
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                iteration += 1;
-                
-                // Simulate realistic playlist download progress
-                current_progress = match iteration {
-                    1..=3 => 10.0 + (iteration as f64 * 5.0), // Initial phase: 10-25%
-                    4..=10 => 25.0 + (iteration as f64 * 3.0), // Download phase: 25-55%
-                    11..=20 => 55.0 + (iteration as f64 * 2.0), // Processing phase: 55-75%
-                    _ => (75.0 + (iteration as f64 * 1.0)).min(95.0), // Final phase: 75-95%
-                };
-                
+        let rustify = Arc::clone(&state_clone.rustify);
+        let output_dir_for_collect = output_dir.clone();
+        let result: anyhow::Result<Vec<anyhow::Result<()>>> = rustify
+            .convert_playlist(
+                &request_clone.url,
+                output_dir.clone(),
+                output_format,
+                &request_clone.quality,
                 {
-                    let mut tasks = state_clone_progress.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_progress) {
-                        if task.status == "processing" {
-                            task.progress = current_progress;
-                        } else {
-                            break;
-                        }
+                    let state = state_clone.clone();
+                    let task_id = task_id.clone();
+                    move |index, progress| {
+                        let overall = (((index as f64) + (progress.percentage / 100.0)) / total_videos)
+                            * 100.0;
+                        let state = state.clone();
+                        let task_id = task_id.clone();
+                        tokio::spawn(async move {
+                            update_task(&state, &task_id, |task| {
+                                task.progress = overall.clamp(0.0, 99.0);
+                            })
+                            .await;
+                            let _ = state.task_updates.send(TaskUpdate {
+                                task_id,
+                                status: TaskStatus::Converting,
+                                progress: overall.clamp(0.0, 99.0),
+                                speed: progress.speed.clone(),
+                                eta: progress.eta.clone(),
+                            });
+                        });
+                    }
+                },
+            )
+            .await;
+
+        match result {
+            Ok(results) => {
+                let failed = results.iter().filter(|result| result.is_err()).count();
+                let files = collect_playlist_files(&output_dir_for_collect).await.unwrap_or_default();
+                update_task(&state_clone, &task_id, |task| {
+                    task.status = if failed == 0 {
+                        "completed".to_string()
                     } else {
-                        break;
-                    }
-                }
-
-                let progress_message = match iteration {
-                    1..=3 => "Fetching playlist information...",
-                    4..=8 => "Downloading videos from playlist...",
-                    9..=15 => "Processing downloaded files...",
-                    16..=20 => "Organizing playlist contents...",
-                    _ => "Finalizing download...",
-                };
-
-                let eta_estimate = match iteration {
-                    1..=5 => format!("{}s remaining", 45 - (iteration * 2)),
-                    6..=15 => format!("{}s remaining", 35 - iteration),
-                    _ => "Almost done".to_string(),
-                };
-
-                let _ = state_clone_progress.task_updates.send(TaskUpdate {
-                    task_id: task_id_progress.clone(),
-                    status: TaskStatus::Converting,
-                    progress: current_progress,
-                    speed: progress_message.to_string(),
-                    eta: eta_estimate,
-                });
-
-                // Break if we've reached 95% to avoid going over 100 before completion
-                if current_progress >= 95.0 {
-                    break;
-                }
-            }
-        });
-
-        // Perform actual playlist download with enhanced error handling
-        match crate::youtube::download_playlist(conversion_options).await {
-            Ok(file_paths) => {
-                // Cancel progress simulation
-                progress_task.abort();
-                
-                // Ensure output directory exists and contains files
-                let _output_dir_path = std::path::Path::new(&playlist_dir);
-                let actual_file_count = file_paths.len();
-                
-                // Create a summary of the download
-                let download_summary = if actual_file_count > 0 {
-                    format!("Successfully downloaded {} files", actual_file_count)
-                } else {
-                    "Playlist processed, check output directory".to_string()
-                };
-                
-                // Update task as completed
-                {
-                    let mut tasks = state_clone.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_clone) {
-                        task.status = "completed".to_string();
-                        task.progress = 100.0;
-                        task.file_path = file_paths.first().cloned();
-                        task.playlist_files = if file_paths.len() > 1 { Some(file_paths) } else { None };
-                        task.output_path = Some(playlist_dir);
-                    }
-                }
-
-                // Broadcast completion with detailed info
+                        format!("completed_with_errors: {} failed", failed)
+                    };
+                    task.progress = 100.0;
+                    task.file_path = files.first().cloned();
+                    task.playlist_files = Some(files.clone());
+                })
+                .await;
                 let _ = state_clone.task_updates.send(TaskUpdate {
-                    task_id: task_id_clone,
+                    task_id,
                     status: TaskStatus::Completed,
                     progress: 100.0,
-                    speed: download_summary,
-                    eta: "Completed".to_string(),
+                    speed: "Complete".to_string(),
+                    eta: "Done".to_string(),
                 });
             }
-            Err(e) => {
-                // Cancel progress simulation
-                progress_task.abort();
-                
-                // Determine if it's a partial failure or complete failure
-                let error_message = e.to_string();
-                let is_partial_failure = error_message.contains("some errors") || 
-                                       error_message.contains("partial");
-                
-                let status_message = if is_partial_failure {
-                    format!("completed_with_errors: {}", error_message)
-                } else {
-                    format!("failed: {}", error_message)
-                };
-                
-                // Update task status
-                {
-                    let mut tasks = state_clone.tasks.lock().await;
-                    if let Some(task) = tasks.get_mut(&task_id_clone) {
-                        task.status = status_message;
-                        task.progress = if is_partial_failure { 75.0 } else { 0.0 };
-                        // Still set output path for partial failures so users can check what was downloaded
-                        if is_partial_failure {
-                            task.output_path = Some(playlist_dir);
-                        }
-                    }
-                }
-
-                // Broadcast failure or partial completion
-                let broadcast_status = if is_partial_failure {
-                    TaskStatus::Completed
-                } else {
-                    TaskStatus::Failed(error_message.clone())
-                };
-
+            Err(error) => {
+                update_task(&state_clone, &task_id, |task| {
+                    task.status = format!("failed: {}", error);
+                })
+                .await;
                 let _ = state_clone.task_updates.send(TaskUpdate {
-                    task_id: task_id_clone,
-                    status: broadcast_status,
-                    progress: if is_partial_failure { 75.0 } else { 0.0 },
-                    speed: if is_partial_failure {
-                        "Completed with some errors - check output folder".to_string()
-                    } else {
-                        format!("Failed: {}", error_message)
-                    },
-                    eta: if is_partial_failure { "Check results" } else { "Failed" }.to_string(),
+                    task_id,
+                    status: TaskStatus::Failed(error.to_string()),
+                    progress: 0.0,
+                    speed: "Failed".to_string(),
+                    eta: "Error".to_string(),
                 });
             }
         }
     });
-    
+
     Ok(Json(task))
 }
 
-// Get all tasks
 pub async fn get_all_tasks(State(state): State<AppState>) -> impl IntoResponse {
     let tasks = state.tasks.lock().await;
     let task_list: Vec<TaskResponse> = tasks.values().cloned().collect();
     Json(task_list)
 }
 
-// Get specific task
 pub async fn get_task(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -547,16 +383,10 @@ pub async fn get_task(
     let tasks = state.tasks.lock().await;
     match tasks.get(&id) {
         Some(task) => Ok(Json(task.clone())),
-        None => Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: "Task not found".to_string(),
-            }),
-        ).into_response()),
+        None => Err(not_found("Task not found")),
     }
 }
 
-// Cancel task
 pub async fn cancel_task(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -565,224 +395,76 @@ pub async fn cancel_task(
     match tasks.get_mut(&id) {
         Some(task) => {
             task.status = "cancelled".to_string();
+            let _ = state.task_updates.send(TaskUpdate {
+                task_id: id.clone(),
+                status: TaskStatus::Cancelled,
+                progress: task.progress,
+                speed: "Cancelled".to_string(),
+                eta: "Stopped".to_string(),
+            });
             Ok(Json(serde_json::json!({"message": "Task cancelled"})))
         }
-        None => Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: "Task not found".to_string(),
-            }),
-        ).into_response()),
+        None => Err(not_found("Task not found")),
     }
 }
 
-// Download file
 pub async fn download_file(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Response, Response> {
-    // Get task to find file path
     let file_path = {
         let tasks = state.tasks.lock().await;
-        match tasks.get(&id) {
-            Some(task) => match &task.file_path {
-                Some(path) => path.clone(),
-                None => {
-                    return Err((
-                        StatusCode::NOT_FOUND,
-                        Json(ErrorResponse {
-                            error: "File not ready for download".to_string(),
-                        }),
-                    ).into_response());
-                }
-            },
-            None => {
-                return Err((
-                    StatusCode::NOT_FOUND,
-                    Json(ErrorResponse {
-                        error: "Task not found".to_string(),
-                    }),
-                ).into_response());
-            }
-        }
+        let Some(task) = tasks.get(&id) else {
+            return Err(not_found("Task not found"));
+        };
+        let Some(file_path) = task.file_path.clone() else {
+            return Err(not_found("File not ready for download"));
+        };
+        file_path
     };
 
-    // Check if file exists
-    if tokio::fs::metadata(&file_path).await.is_err() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: "File not found on disk".to_string(),
-            }),
-        ).into_response());
-    }
-
-    // Get filename for Content-Disposition header
-    let filename = std::path::Path::new(&file_path)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("download");
-
-    // Open file
-    let file = match File::open(&file_path).await {
-        Ok(file) => file,
-        Err(_) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "Failed to open file".to_string(),
-                }),
-            ).into_response());
-        }
-    };
-
-    // Create stream
-    let stream = ReaderStream::new(file);
-    let body = axum::body::Body::from_stream(stream);
-
-    // Determine content type based on file extension
-    let content_type = if filename.ends_with(".mp3") {
-        "audio/mpeg"
-    } else if filename.ends_with(".wav") {
-        "audio/wav"
-    } else if filename.ends_with(".mp4") {
-        "video/mp4"
-    } else if filename.ends_with(".webm") {
-        "video/webm"
-    } else {
-        "application/octet-stream"
-    };
-
-    Ok((
-        StatusCode::OK,
-        [
-            ("Content-Type", content_type),
-            ("Content-Disposition", &format!("attachment; filename=\"{}\"", filename)),
-            ("Cache-Control", "no-cache"),
-        ],
-        body,
-    ).into_response())
+    serve_download_file(&file_path).await
 }
 
-// Download individual playlist file
 pub async fn download_playlist_file(
     State(state): State<AppState>,
     Path((task_id, file_index)): Path<(String, usize)>,
 ) -> Result<Response, Response> {
-    // Get task to find playlist files
     let file_path = {
         let tasks = state.tasks.lock().await;
-        match tasks.get(&task_id) {
-            Some(task) => {
-                if let Some(playlist_files) = &task.playlist_files {
-                    if file_index < playlist_files.len() {
-                        playlist_files[file_index].clone()
-                    } else {
-                        return Err((
-                            StatusCode::NOT_FOUND,
-                            Json(ErrorResponse {
-                                error: "File index out of range".to_string(),
-                            }),
-                        ).into_response());
-                    }
-                } else {
-                    // Fallback to single file if no playlist files
-                    match &task.file_path {
-                        Some(path) => path.clone(),
-                        None => {
-                            return Err((
-                                StatusCode::NOT_FOUND,
-                                Json(ErrorResponse {
-                                    error: "File not ready for download".to_string(),
-                                }),
-                            ).into_response());
-                        }
-                    }
-                }
-            },
-            None => {
-                return Err((
-                    StatusCode::NOT_FOUND,
-                    Json(ErrorResponse {
-                        error: "Task not found".to_string(),
-                    }),
-                ).into_response());
+        let Some(task) = tasks.get(&task_id) else {
+            return Err(not_found("Task not found"));
+        };
+
+        if let Some(playlist_files) = &task.playlist_files {
+            if let Some(file_path) = playlist_files.get(file_index) {
+                file_path.clone()
+            } else {
+                return Err(not_found("File index out of range"));
             }
+        } else if let Some(file_path) = &task.file_path {
+            file_path.clone()
+        } else {
+            return Err(not_found("File not ready for download"));
         }
     };
 
-    // Check if file exists
-    if tokio::fs::metadata(&file_path).await.is_err() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: "File not found on disk".to_string(),
-            }),
-        ).into_response());
-    }
-
-    // Get filename for Content-Disposition header
-    let filename = std::path::Path::new(&file_path)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("download");
-
-    // Open file
-    let file = match File::open(&file_path).await {
-        Ok(file) => file,
-        Err(_) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "Failed to open file".to_string(),
-                }),
-            ).into_response());
-        }
-    };
-
-    // Create stream
-    let stream = ReaderStream::new(file);
-    let body = axum::body::Body::from_stream(stream);
-
-    // Determine content type based on file extension
-    let content_type = if filename.ends_with(".mp3") {
-        "audio/mpeg"
-    } else if filename.ends_with(".wav") {
-        "audio/wav"
-    } else if filename.ends_with(".mp4") {
-        "video/mp4"
-    } else if filename.ends_with(".webm") {
-        "video/webm"
-    } else if filename.ends_with(".m4a") {
-        "audio/mp4"
-    } else {
-        "application/octet-stream"
-    };
-
-    Ok((
-        StatusCode::OK,
-        [
-            ("Content-Type", content_type),
-            ("Content-Disposition", &format!("attachment; filename=\"{}\"", filename)),
-            ("Cache-Control", "no-cache"),
-        ],
-        body,
-    ).into_response())
+    serve_download_file(&file_path).await
 }
 
-// Clear completed tasks and their associated files
 pub async fn clear_completed_tasks(State(state): State<AppState>) -> impl IntoResponse {
-    info!("Starting cleanup of completed tasks");
-    
-    let mut tasks_to_clear = Vec::new();
+    info!("Clearing completed tasks");
+
     let mut files_to_delete = Vec::new();
-    
-    // Collect completed tasks
     {
-        let tasks = state.tasks.lock().await;
-        for (task_id, task) in tasks.iter() {
-            if task.status == "completed" || task.status.starts_with("failed") || task.status.starts_with("completed_with_errors") {
-                tasks_to_clear.push(task_id.clone());
+        let mut tasks = state.tasks.lock().await;
+        tasks.retain(|_, task| {
+            let should_delete = task.status == "completed"
+                || task.status.starts_with("failed")
+                || task.status.starts_with("completed_with_errors")
+                || task.status == "cancelled";
+
+            if should_delete {
                 if let Some(file_path) = &task.file_path {
                     files_to_delete.push(file_path.clone());
                 }
@@ -790,64 +472,29 @@ pub async fn clear_completed_tasks(State(state): State<AppState>) -> impl IntoRe
                     files_to_delete.extend(playlist_files.clone());
                 }
             }
-        }
+
+            !should_delete
+        });
     }
-    
-    let mut cleared_count = 0;
-    let mut file_deletion_errors = Vec::new();
-    
-    // Remove completed tasks from memory
-    {
-        let mut tasks = state.tasks.lock().await;
-        for task_id in &tasks_to_clear {
-            if tasks.remove(task_id).is_some() {
-                cleared_count += 1;
-            }
-        }
-    }
-    
-    // Delete associated files
+
     for file_path in files_to_delete {
-        match tokio::fs::remove_file(&file_path).await {
-            Ok(_) => {
-                info!("Successfully deleted file: {}", file_path);
-            }
-            Err(e) => {
-                let error_msg = format!("Failed to delete file {}: {}", file_path, e);
-                tracing::warn!("{}", error_msg);
-                file_deletion_errors.push(error_msg);
-            }
-        }
+        let _ = tokio::fs::remove_file(&file_path).await;
     }
-    
-    // Also clean up temporary directories if empty
-    if let Err(e) = cleanup_empty_directories(&state.downloads_dir).await {
-        tracing::warn!("Failed to cleanup empty directories: {}", e);
-    }
-    
-    let response = serde_json::json!({
+
+    let _ = cleanup_empty_directories(&state.downloads_dir).await;
+
+    Json(serde_json::json!({
         "message": "Completed tasks cleared successfully",
-        "cleared_count": cleared_count,
-        "file_deletion_errors": file_deletion_errors,
         "status": "success"
-    });
-    
-    info!("Cleared {} completed tasks", cleared_count);
-    Json(response)
+    }))
 }
 
-// Clear all tasks (including running ones) - Admin function
 pub async fn clear_all_tasks(State(state): State<AppState>) -> impl IntoResponse {
-    info!("Starting cleanup of ALL tasks (Admin operation)");
-    
+    info!("Clearing all tasks");
+
     let mut files_to_delete = Vec::new();
-    let task_count;
-    
-    // Collect all tasks and their files
     {
-        let tasks = state.tasks.lock().await;
-        task_count = tasks.len();
-        
+        let mut tasks = state.tasks.lock().await;
         for task in tasks.values() {
             if let Some(file_path) = &task.file_path {
                 files_to_delete.push(file_path.clone());
@@ -856,97 +503,277 @@ pub async fn clear_all_tasks(State(state): State<AppState>) -> impl IntoResponse
                 files_to_delete.extend(playlist_files.clone());
             }
         }
-    }
-    
-    // Clear all tasks from memory
-    {
-        let mut tasks = state.tasks.lock().await;
         tasks.clear();
     }
-    
-    let mut file_deletion_errors = Vec::new();
-    
-    // Delete all associated files
+
     for file_path in files_to_delete {
-        match tokio::fs::remove_file(&file_path).await {
-            Ok(_) => {
-                info!("Successfully deleted file: {}", file_path);
-            }
-            Err(e) => {
-                let error_msg = format!("Failed to delete file {}: {}", file_path, e);
-                tracing::warn!("{}", error_msg);
-                file_deletion_errors.push(error_msg);
-            }
-        }
+        let _ = tokio::fs::remove_file(&file_path).await;
     }
-    
-    // Clean up all temporary directories
-    if let Err(e) = cleanup_all_directories(&state.downloads_dir).await {
-        tracing::warn!("Failed to cleanup directories: {}", e);
-    }
-    
-    let response = serde_json::json!({
+    let _ = cleanup_all_directories(&state.downloads_dir).await;
+
+    Json(serde_json::json!({
         "message": "All tasks cleared successfully",
-        "cleared_count": task_count,
-        "file_deletion_errors": file_deletion_errors,
         "status": "success"
-    });
-    
-    info!("Cleared {} total tasks", task_count);
-    Json(response)
+    }))
 }
 
-// Helper function to clean up empty directories
-async fn cleanup_empty_directories(downloads_dir: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let downloads_path = std::path::Path::new(downloads_dir);
-    
-    if !downloads_path.exists() {
-        return Ok(());
+fn map_quality_options(qualities: &CoreQualityOptions) -> QualityOptions {
+    QualityOptions {
+        audio: qualities
+            .audio_qualities
+            .iter()
+            .map(|quality| FormatOption {
+                label: format!("{} kbps {}", quality.bitrate, quality.format),
+                codec: quality.codec.clone(),
+                detail: quality
+                    .sample_rate
+                    .map(|sample_rate| format!("{sample_rate} Hz"))
+                    .unwrap_or_else(|| "source rate".to_string()),
+                filesize: quality.file_size,
+            })
+            .collect(),
+        video: qualities
+            .video_qualities
+            .iter()
+            .map(|quality| FormatOption {
+                label: quality.resolution.clone(),
+                codec: quality.codec.clone(),
+                detail: quality
+                    .fps
+                    .map(|fps| format!("{fps:.0} fps"))
+                    .unwrap_or_else(|| "source fps".to_string()),
+                filesize: quality.file_size,
+            })
+            .collect(),
     }
-    
-    let mut entries = tokio::fs::read_dir(downloads_path).await?;
-    
+}
+
+fn parse_output_format(format: &str, quality: &str) -> Result<OutputFormat, String> {
+    match format.trim().to_ascii_lowercase().as_str() {
+        "mp3" => Ok(OutputFormat::Mp3 {
+            bitrate: parse_audio_bitrate(quality, 320)?,
+        }),
+        "flac" => Ok(OutputFormat::Flac),
+        "wav" => Ok(OutputFormat::Wav),
+        "aac" => Ok(OutputFormat::Aac {
+            bitrate: parse_audio_bitrate(quality, 256)?,
+        }),
+        "ogg" => Ok(OutputFormat::Ogg {
+            quality: quality.parse::<u8>().unwrap_or(6),
+        }),
+        "mp4" => Ok(OutputFormat::Mp4 {
+            resolution: quality.to_string(),
+        }),
+        "webm" => Ok(OutputFormat::WebM {
+            resolution: quality.to_string(),
+        }),
+        other => Err(format!("Unsupported format: {other}")),
+    }
+}
+
+fn parse_audio_bitrate(value: &str, default: u32) -> Result<u32, String> {
+    let digits = value
+        .chars()
+        .filter(|character| character.is_ascii_digit())
+        .collect::<String>();
+    if digits.is_empty() {
+        return Ok(default);
+    }
+
+    digits
+        .parse::<u32>()
+        .map_err(|error| format!("Invalid bitrate '{value}': {error}"))
+}
+
+fn extension_for_format(format: &OutputFormat) -> &'static str {
+    match format {
+        OutputFormat::Mp3 { .. } => "mp3",
+        OutputFormat::Mp4 { .. } => "mp4",
+        OutputFormat::Flac => "flac",
+        OutputFormat::Wav => "wav",
+        OutputFormat::Aac { .. } => "aac",
+        OutputFormat::Ogg { .. } => "ogg",
+        OutputFormat::WebM { .. } => "webm",
+    }
+}
+
+fn ensure_youtube_url(url: &str) -> Result<(), Response> {
+    if is_valid_youtube_url(url) {
+        Ok(())
+    } else {
+        Err(bad_request(anyhow::anyhow!("Invalid YouTube URL: {url}")))
+    }
+}
+
+fn ensure_playlist_url(url: &str) -> Result<(), Response> {
+    if is_supported_playlist_url(url) {
+        Ok(())
+    } else {
+        Err(bad_request(anyhow::anyhow!(
+            "Invalid playlist URL: {url}. Rustify supports YouTube and Spotify playlist links."
+        )))
+    }
+}
+
+fn ensure_info_url(url: &str) -> Result<(), Response> {
+    if is_valid_youtube_url(url) || is_valid_spotify_playlist_url(url) {
+        Ok(())
+    } else {
+        Err(bad_request(anyhow::anyhow!(
+            "Invalid URL: {url}. Rustify info supports YouTube videos and YouTube / Spotify playlists."
+        )))
+    }
+}
+
+fn is_playlist_url(url: &str) -> bool {
+    url.contains("playlist?list=") || is_valid_spotify_playlist_url(url)
+}
+
+fn bad_request(error: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponse {
+            error: error.to_string(),
+        }),
+    )
+        .into_response()
+}
+
+fn not_found(message: &str) -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: message.to_string(),
+        }),
+    )
+        .into_response()
+}
+
+async fn apply_progress_update(state: &AppState, task_id: &str, progress: &ConversionProgress) {
+    update_task(state, task_id, |task| {
+        task.progress = progress.percentage;
+        task.status = "processing".to_string();
+    })
+    .await;
+    let _ = state.task_updates.send(TaskUpdate {
+        task_id: task_id.to_string(),
+        status: TaskStatus::Converting,
+        progress: progress.percentage,
+        speed: progress.speed.clone(),
+        eta: progress.eta.clone(),
+    });
+}
+
+async fn update_task(
+    state: &AppState,
+    task_id: &str,
+    mut update: impl FnMut(&mut TaskResponse),
+) {
+    let mut tasks = state.tasks.lock().await;
+    if let Some(task) = tasks.get_mut(task_id) {
+        update(task);
+    }
+}
+
+async fn serve_download_file(file_path: &str) -> Result<Response, Response> {
+    if tokio::fs::metadata(file_path).await.is_err() {
+        return Err(not_found("File not found on disk"));
+    }
+
+    let filename = std::path::Path::new(file_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("download");
+
+    let file = File::open(file_path)
+        .await
+        .map_err(|_| not_found("Failed to open file"))?;
+    let stream = ReaderStream::new(file);
+    let body = axum::body::Body::from_stream(stream);
+
+    Ok((
+        StatusCode::OK,
+        [
+            ("Content-Type", content_type_for_filename(filename)),
+            (
+                "Content-Disposition",
+                &format!("attachment; filename=\"{}\"", filename),
+            ),
+            ("Cache-Control", "no-cache"),
+        ],
+        body,
+    )
+        .into_response())
+}
+
+fn content_type_for_filename(filename: &str) -> &'static str {
+    if filename.ends_with(".mp3") {
+        "audio/mpeg"
+    } else if filename.ends_with(".flac") {
+        "audio/flac"
+    } else if filename.ends_with(".wav") {
+        "audio/wav"
+    } else if filename.ends_with(".aac") {
+        "audio/aac"
+    } else if filename.ends_with(".ogg") {
+        "audio/ogg"
+    } else if filename.ends_with(".mp4") {
+        "video/mp4"
+    } else if filename.ends_with(".webm") {
+        "video/webm"
+    } else {
+        "application/octet-stream"
+    }
+}
+
+async fn collect_playlist_files(output_dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
+    let mut files = Vec::new();
+    let mut entries = tokio::fs::read_dir(output_dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        
+        if path.is_file() {
+            files.push(path.to_string_lossy().to_string());
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+async fn cleanup_empty_directories(
+    downloads_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !downloads_dir.exists() {
+        return Ok(());
+    }
+
+    let mut entries = tokio::fs::read_dir(downloads_dir).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
         if path.is_dir() {
-            // Check if directory is empty
             let mut dir_entries = tokio::fs::read_dir(&path).await?;
             if dir_entries.next_entry().await?.is_none() {
-                // Directory is empty, remove it
-                if let Err(e) = tokio::fs::remove_dir(&path).await {
-                    tracing::warn!("Failed to remove empty directory {:?}: {}", path, e);
-                } else {
-                    info!("Removed empty directory: {:?}", path);
-                }
+                let _ = tokio::fs::remove_dir(&path).await;
             }
         }
     }
-    
+
     Ok(())
 }
 
-// Helper function to clean up all directories (Admin function)
-async fn cleanup_all_directories(downloads_dir: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let downloads_path = std::path::Path::new(downloads_dir);
-    
-    if !downloads_path.exists() {
+async fn cleanup_all_directories(
+    downloads_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !downloads_dir.exists() {
         return Ok(());
     }
-    
-    let mut entries = tokio::fs::read_dir(downloads_path).await?;
-    
+
+    let mut entries = tokio::fs::read_dir(downloads_dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        
         if path.is_dir() {
-            if let Err(e) = tokio::fs::remove_dir_all(&path).await {
-                tracing::warn!("Failed to remove directory {:?}: {}", path, e);
-            } else {
-                info!("Removed directory: {:?}", path);
-            }
+            let _ = tokio::fs::remove_dir_all(&path).await;
         }
     }
-    
+
     Ok(())
 }

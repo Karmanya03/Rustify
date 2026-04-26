@@ -7,7 +7,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "EzP3",
+    "productName": "Rustify",
     "version": "0.1.0"
   },
   "tauri": {
@@ -50,7 +50,7 @@
         "fullscreen": false,
         "height": 700,
         "resizable": true,
-        "title": "EzP3 - YouTube Converter",
+        "title": "Rustify - Local YouTube Converter",
         "width": 1000,
         "minWidth": 800,
         "minHeight": 600

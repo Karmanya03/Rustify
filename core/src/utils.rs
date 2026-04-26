@@ -104,6 +104,11 @@ pub fn is_valid_youtube_url(url: &str) -> bool {
     })
 }
 
+/// Validate playlist URLs supported by Rustify.
+pub fn is_supported_playlist_url(url: &str) -> bool {
+    is_valid_youtube_url(url) || crate::spotify::is_valid_spotify_playlist_url(url)
+}
+
 /// Extract video ID from YouTube URL
 pub fn extract_video_id(url: &str) -> Option<String> {
     // For youtube.com/watch?v=ID
@@ -227,6 +232,13 @@ mod tests {
         assert!(is_valid_youtube_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
         assert!(is_valid_youtube_url("https://youtu.be/dQw4w9WgXcQ"));
         assert!(!is_valid_youtube_url("https://example.com"));
+    }
+
+    #[test]
+    fn test_validate_spotify_playlist_url() {
+        assert!(crate::spotify::is_valid_spotify_playlist_url("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"));
+        assert!(crate::spotify::is_valid_spotify_playlist_url("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"));
+        assert!(!crate::spotify::is_valid_spotify_playlist_url("https://open.spotify.com/track/37i9dQZF1DXcBWIGoYBM5M"));
     }
 
     #[test]

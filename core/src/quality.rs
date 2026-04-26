@@ -102,6 +102,7 @@ fn parse_audio_quality(format: &FormatInfo) -> Option<AudioQuality> {
         "mp3" | "libmp3lame" => "MP3",
         "aac" | "libfdk_aac" => "AAC",
         "flac" => "FLAC",
+        "pcm_s16le" | "pcm_s24le" | "wav" => "WAV",
         "vorbis" | "libvorbis" => "OGG",
         "opus" | "libopus" => "Opus",
         _ => "Unknown",
